@@ -1,14 +1,12 @@
 param(
 		[Parameter(Mandatory)]
 		[DateTime]
-	$ProfileStartTime,
-		[Parameter(Mandatory)]
-		[Management.Automation.PathInfo]
-	$CONFIG_DIR
+	$ProfileStartTime
 )
 
+$SCRIPT_DIR = Split-Path -parent $MyInvocation.MyCommand.Path
+Import-Module $CONFIG_DIR/modules/Format-TimeSpan
 
-. $CONFIG_DIR\functions.ps1
 
 
 # RGB colors for Write-Host
@@ -78,12 +76,12 @@ Function global:Prompt {
 	if ($null -ne (Get-History -Count 1)) {
 		$lastCmd = Get-History -Count 1
 		$executionTime = $lastCmd.EndExecutionTime - $lastCmd.StartExecutionTime
-		$statusStr += _Format-TimeSpan $executionTime
+		$statusStr += Format-TimeSpan $executionTime
 	} else {
 		# we just started up, display startup time
 		$statusStr += "startup: "
-		$statusStr += _Format-TimeSpan ((Get-Date) - (Get-Process -Id $pid).StartTime)
-		$statusStr += " (profile: " + (_Format-TimeSpan ((Get-Date) - $global:_ProfileStartTime)) + ")"
+		$statusStr += Format-TimeSpan ((Get-Date) - (Get-Process -Id $pid).StartTime)
+		$statusStr += " (profile: " + (Format-TimeSpan ((Get-Date) - $global:_ProfileStartTime)) + ")"
 	}
 	
 	# render status
