@@ -15,6 +15,8 @@ function Wait-FileChange {
 		$periodicCb
 	)
 
+	$Path = Resolve-Path $Path
+	
 	$watcher = New-Object System.IO.FileSystemWatcher
 	$watcher.Path = Split-Path $Path -Parent
 	$watcher.IncludeSubdirectories = $false

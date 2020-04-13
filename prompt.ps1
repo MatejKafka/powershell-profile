@@ -1,16 +1,16 @@
 param(
 		[Parameter(Mandatory)]
 		[DateTime]
+		# should be intialized at the start of $PROFILE using `$ProfileStartTime = Get-Date`
 	$ProfileStartTime
 )
 
 $SCRIPT_DIR = Split-Path -parent $MyInvocation.MyCommand.Path
 Import-Module $CONFIG_DIR/modules/Format-TimeSpan
 
-
-
 # RGB colors for Write-Host
 Import-Module Pansies
+
 
 
 # autocomplete should offer all options, not fill in the first one
