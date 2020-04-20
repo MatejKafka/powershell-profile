@@ -5,9 +5,8 @@ param(
 	$ProfileStartTime
 )
 
-$SCRIPT_DIR = Split-Path -parent $MyInvocation.MyCommand.Path
-Import-Module $CONFIG_DIR/modules/Format-TimeSpan
-
+Import-Module $PSScriptRoot/modules/Format-TimeSpan
+Import-Module $PSScriptRoot/modules/Write-HostLineEnd
 # RGB colors for Write-Host
 Import-Module Pansies
 
@@ -85,7 +84,7 @@ Function global:Prompt {
 	}
 	
 	# render status
-	_Write-HostLineEnd ($statusStr + " ╠╗") $color -dy -2
+	Write-HostLineEnd ($statusStr + " ╠╗") $color -dy -2
 
 	# reset exit code
 	$global:LastExitCode = 0
