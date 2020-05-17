@@ -1,3 +1,4 @@
+#Requires -Modules Format-TimeSpan, Write-HostLineEnd, Pansies
 param(
 		[Parameter(Mandatory)]
 		[DateTime]
@@ -5,15 +6,13 @@ param(
 	$ProfileStartTime
 )
 
-Import-Module $PSScriptRoot/modules/Format-TimeSpan
-Import-Module $PSScriptRoot/modules/Write-HostLineEnd
-# RGB colors for Write-Host
-Import-Module Pansies
-
-
 
 # autocomplete should offer all options, not fill in the first one
-Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
+Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
+# set which part of prompt is highlighted in red for invalid input
+Set-PSReadLineOption -PromptText "> "
+# inform PSReadLine that our prompt has 2 lines
+Set-PSReadLineOption -ExtraPromptLineCount 1
 
 
 # written by our overriden version of Out-Default
@@ -23,15 +22,74 @@ $global:LastExitCode = 0
 # otherwise python venv would break our fancy Prompt
 $Env:VIRTUAL_ENV_DISABLE_PROMPT = $true
 
+$script:StartupTime = $null
+$script:ProfileTime = $null
+
+
+Function Get-LastCommandStatus {
+	param(
+			[Parameter(Mandatory)]
+			[boolean]
+		$ErrorOccurred,
+			[Parameter(Mandatory)]
+			[int]
+		$LastExitCode
+	)
+
+	# status string indicating outcome of previous command
+	$StatusStr = ""
+
+	# render output type of previous command, unless it resulted in an error
+	if ($global:_LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+		if ($global:_LastCmdOutputTypes.Length -gt 1) {
+			$StatusStr += "[" + $global:_LastCmdOutputTypes.Length + "]"
+		}
+		$StatusStr += $global:_LastCmdOutputTypes[0].ToString() + " | "
+	}
+
+	# print exit code if error occurred
+	if ($ErrorOccurred) {
+		if ($LastExitCode -eq -1073741510) {
+			$StatusStr += "Ctrl-C | "
+		} elseif ($LastExitCode -eq 0) {
+			# error originates from powershell
+			$StatusStr += "Error | "
+		} else {
+			# error from external command
+			$StatusStr += [string]$LastExitCode + " | "
+		}
+	}
+	
+	# print run time of last command, or startup time if this is the first time we're rendering prompt
+	$LastCmd = Get-History -Count 1
+	if ($null -ne $LastCmd) {
+		$ExecutionTime = $LastCmd.EndExecutionTime - $LastCmd.StartExecutionTime
+		$StatusStr += Format-TimeSpan $ExecutionTime
+	} else {
+		# we just started up, display startup time
+		if ($script:StartupTime -eq $null) {
+			$script:StartupTime = (Get-Date) - (Get-Process -Id $pid).StartTime
+			$script:ProfileTime = (Get-Date) - $ProfileStartTime
+		}
+		$StatusStr += "startup: "
+		$StatusStr += Format-TimeSpan $script:StartupTime
+		$StatusStr += " (profile: " + (Format-TimeSpan $script:ProfileTime) + ")"
+	}
+	
+	return $StatusStr
+}
+
+
+$script:LastCmdId = $null
 
 Function global:Prompt {
-	$errOcurred = -not ($? -and ($global:LastExitCode -eq 0))
-	if ($errOcurred) {
-		$color = [PoshCode.Pansies.RgbColor]"#906060"
-		$cwdColor = [PoshCode.Pansies.RgbColor]"#C99999"
+	$ErrorOccurred = -not ($? -and ($global:LastExitCode -eq 0))
+	if ($ErrorOccurred) {
+		$Color = [PoshCode.Pansies.RgbColor]"#906060"
+		$CwdColor = [PoshCode.Pansies.RgbColor]"#C99999"
 	} else {
-		$color = [PoshCode.Pansies.RgbColor]"#666696"
-		$cwdColor = [PoshCode.Pansies.RgbColor]"#9999C9"
+		$Color = [PoshCode.Pansies.RgbColor]"#666696"
+		$CwdColor = [PoshCode.Pansies.RgbColor]"#9999C9"
 	}
 
 	if ($Host.UI.RawUI.CursorPosition.Y -eq 0) {
@@ -39,58 +97,37 @@ Function global:Prompt {
 		Write-Host ""
 	}
 
-	Write-Host "╦" -NoNewLine -ForegroundColor $color
-	Write-Host ("═" * ($Host.UI.RawUI.WindowSize.Width - 2)) -NoNewLine -ForegroundColor $color
-	Write-Host "╩" -ForegroundColor $color
 
-	Write-Host "╚╣ " -NoNewLine -ForegroundColor $color
+	$LastCmd = Get-History -Count 1
+	$StatusStr = if (($LastCmd -eq $null) -or ($LastCmd.Id -ne $script:LastCmdID)) {
+		if ($LastCmd -ne $null) {
+			$script:LastCmdId = $LastCmd.Id
+		}
+		# render previous command status
+		Get-LastCommandStatus $ErrorOccurred $global:LastExitCode
+	} else {
+		"" # should be empty, as sometimes I rerender prompt in same place, which should keep previous time
+	}
+	Write-HostLineEnd ($StatusStr + " ╠╗") $Color -dy -1
+	
+	
+	# write horizontal separator
+	Write-Host ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
+	Write-Host  "╚╣ " -NoNewLine -ForegroundColor $Color
+	
 	# show if we're running with active python venv
 	if ($null -ne $env:VIRTUAL_ENV) {
-		Write-Host "(venv) " -NoNewLine -ForegroundColor $color
-	}
-	Write-Host ([string](Get-Location) + ">") -NoNewLine -ForegroundColor $cwdColor
-	
-	
-	# status string indicating outcome of previous command
-	$statusStr = ""
-
-	# render output type of previous command, unless it resulted in an error
-	if ($global:_LastCmdOutputTypes.Length -gt 0 -and -not $errOcurred) {
-		if ($global:_LastCmdOutputTypes.Length -gt 1) {
-			$statusStr += "[" + $global:_LastCmdOutputTypes.Length + "] "
-		}
-		$statusStr += $global:_LastCmdOutputTypes[0].ToString() + " | "
-	}
-
-	# print exit code if error occurred
-	if ($errOcurred) {
-		if ($global:LastExitCode -eq -1073741510) {
-			$statusStr += "Ctrl-C | "
-		} else {
-			$statusStr += [string]$global:LastExitCode + " | "
-		}
+		Write-Host "(venv) " -NoNewLine -ForegroundColor $Color
 	}
 	
-	# print run time of last command, or startup time if this is the first time we're rendering prompt
-	if ($null -ne (Get-History -Count 1)) {
-		$lastCmd = Get-History -Count 1
-		$executionTime = $lastCmd.EndExecutionTime - $lastCmd.StartExecutionTime
-		$statusStr += Format-TimeSpan $executionTime
-	} else {
-		# we just started up, display startup time
-		$statusStr += "startup: "
-		$statusStr += Format-TimeSpan ((Get-Date) - (Get-Process -Id $pid).StartTime)
-		$statusStr += " (profile: " + (Format-TimeSpan ((Get-Date) - $global:_ProfileStartTime)) + ")"
-	}
+	# write prompt itself
+	Write-Host ([string](Get-Location)) -NoNewLine -ForegroundColor $CwdColor
 	
-	# render status
-	Write-HostLineEnd ($statusStr + " ╠╗") $color -dy -2
-
 	# reset exit code
 	$global:LastExitCode = 0
 	# reset last output types
 	$global:_LastCmdOutputTypes = @()
-	return " "
+	return "> "
 }
 
 
