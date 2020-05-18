@@ -1,2 +1,4 @@
 /profile.ps1
 /Modules/*
+/Custom/Copy-ToVM/*
+/Custom/Invoke-Notepad/*
