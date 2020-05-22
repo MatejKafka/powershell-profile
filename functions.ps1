@@ -1,5 +1,7 @@
 #Requires -Modules Wait-FileChange, Format-TimeSpan, Invoke-Notepad, ScratchFile
 
+Import-Module D:\_\.lib\Pkg.psm1
+
 New-Alias npp Invoke-Notepad
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
