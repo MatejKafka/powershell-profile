@@ -1,5 +1,12 @@
 # hacked together, needs rewrite
 
+
+Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
+	cd ..
+	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
+}
+
+
 $rui = $Host.UI.RawUI
 
 function PadLine {
@@ -10,48 +17,33 @@ function PadLine {
 		-NoNewLine:$NoNewLine -ForegroundColor $ForegroundColor
 }
 
+$script:MaxListCount = 20
 
-function Get-MatchingDirectories {
-	param([Parameter(Mandatory)]$prefix)
-	
-	return ls -Directory -Filter ($prefix + "*") | select -ExpandProperty Name
-}
-
-
-Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
-	cd ..
-	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
-}
-
-
-function PrintDirectoryList($baseCursor, $dir, $prevCount) {
-	$printCursor = $baseCursor
-	$printCursor.X = 0
-	$printCursor.Y += 1
-	$rui.CursorPosition = $printCursor
-
+function PrintDirectoryList($baseCursor, $matching) {
+	$rui.CursorPosition = $baseCursor
 	$CurrentHeight = 0
-	$matching = Get-MatchingDirectories $dir
+	
+	Write-Host ""
 
-	if (@($matching).Count -eq 0) {
-		Write-Host -NoNewLine -ForegroundColor "#666696" (" ╠" + "⸨ ")
+	if ($null -eq $matching) {
+		Write-Host -NoNewLine -ForegroundColor "#666696" (" ╚⸨ ")
 		PadLine "NO DIRECTORIES" -ForegroundColor "#C99999"
-		$CurrentHeight = 1
+		$CurrentHeight += 1
 	} else {
-		$matching | % {
-			Write-Host -NoNewLine -ForegroundColor "#666696" (" ╠" + "⸨ ")
+		$matching | select -First $script:MaxListCount | % {
+			Write-Host -NoNewLine -ForegroundColor "#666696" (" ╠⸨ ")
 			PadLine $_ -ForegroundColor "#9999C9"
+			$CurrentHeight += 1
 		}
-		$CurrentHeight = @($matching).Count
+		if (@($matching).Count -gt $script:MaxListCount) {
+			PadLine -ForegroundColor "#666696" (" ╚⸨ " + "... (+$($matching.Count - $script:MaxListCount))")
+			return
+		}
 	}
 	
-	if ($CurrentHeight -lt $LastHeight) {
-		foreach ($i in $CurrentHeight..$LastHeight) {
-			PadLine ""
-		}
-	}
-
-	return $CurrentHeight
+	foreach ($i in $CurrentHeight..($script:MaxListCount)) {
+		PadLine ""
+	}	
 }
 
 function PrintCurrentInput($baseCursor, $buffer) {
@@ -66,10 +58,9 @@ function PrintCurrentInput($baseCursor, $buffer) {
 	$rui.CursorPosition = $c
 }
 
-function CompleteNext($buffer) {
+function CompleteNext($buffer, $items) {
 	# complete to nearest different char
-	$items = Get-MatchingDirectories $buffer
-	if (@($items).Count -eq 0) {
+	if ($null -eq $items) {
 		return ""
 	}
 	$base = @($items)[0].ToLower()
@@ -81,44 +72,67 @@ function CompleteNext($buffer) {
 	return $base
 }
 
-function DeleteNext($buffer) {
+function DeleteNext($buffer, $items) {
 	if ($buffer -eq "") {
 		return ""
 	}
-	$c = @(Get-MatchingDirectories $buffer).Count
-	if ($c -eq 0) {
+	if (@($items).Count -eq 0) {
 		return ""
 	}
 	
 	do {
 		$buffer = $buffer.Substring(0, $buffer.Length - 1)
-	} while (@(Get-MatchingDirectories $buffer).Count -eq $c)
+	} while (@(GetMatching $buffer $items).Count -eq $c)
 	return $buffer
 }
 
+function GetMatching($prefix, $strings) {
+	$strings | where {$_ -like ($prefix + "*")}
+}
+
+$script:baseCursor = $null
+$script:buffer = $null
 Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
-	$baseCursor = $rui.CursorPosition
+	$script:buffer = ""
+	$script:baseCursor = $rui.CursorPosition
 	
-	$buffer = ""
-	$LastHeight = 0
+	function Refresh {
+		$script:buffer = ""
+		[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
+		$script:baseCursor = $rui.CursorPosition	
+	}
+	
+	# create space for list
+	$MaxLines = $script:MaxListCount + 2
+	$y = $script:baseCursor.Y + $MaxLines
+	if ($y -ge $rui.BufferSize.Height) {
+		foreach ($i in 1..$MaxLines) {
+			Write-Host ""
+		}
+		$script:baseCursor.Y = $rui.BufferSize.Height - $MaxLines - 1
+		# -1 for y to compensate multiline prompt
+		[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $script:baseCursor.Y - 1)
+	}
+	
 	while ($true) {
-		if ($buffer -ne "") {
-			$buffer = CompleteNext $buffer
+		$dirs = ls -Force -Directory | select -ExpandProperty Name
+		$matching = GetMatching $script:buffer $dirs
+	
+		if ($script:buffer -ne "") {
+			$script:buffer = CompleteNext $script:buffer $matching
+			$matching = GetMatching $script:buffer $dirs
 		}
 		
-		if (Test-Path -PathType Container $buffer) {
-			cd $buffer
-			$rui.CursorPosition = $baseCursor
-			Write-Host -NoNewLine (" " * $buffer.Length)
-			$buffer = ""
-			[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
-			$baseCursor = $rui.CursorPosition
+		if ($script:buffer -in $matching -and $matching.Count -eq 1) {
+			# we have single exact match
+			cd $script:buffer
+			Refresh
 			continue
 		}
 		
 		[Console]::CursorVisible = $false
-		$LastHeight = PrintDirectoryList $baseCursor $buffer $LastHeight
-		PrintCurrentInput $baseCursor $buffer
+		PrintDirectoryList $script:baseCursor $matching
+		PrintCurrentInput $script:baseCursor $script:buffer
 		[Console]::CursorVisible = $true
 	
 		$key = $rui.ReadKey("AllowCtrlC,IncludeKeyDown")
@@ -130,28 +144,50 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		
 		# Backspace
 		if ($key.VirtualKeyCode -eq 8) {
-			$buffer = DeleteNext $buffer
+			$script:buffer = DeleteNext $script:buffer
 			continue
+		}
+		
+		# Enter
+		if ($key.VirtualKeyCode -eq 13) {
+			if ($script:buffer -in $matching) {
+				# we have exact match
+				cd $script:buffer
+				Refresh
+				continue
+			}	
 		}
 		
 		# Up arrow
 		if ($key.VirtualKeyCode -eq 38) {
 			cd ..
-			$buffer = ""
-			[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
-			$baseCursor = $rui.CursorPosition
+			Refresh
+			continue
+		}
+		
+		# Left arrow
+		if ($key.VirtualKeyCode -eq 37) {
+			C:
+			Refresh
+			continue
+		}
+
+		# Right arrow
+		if ($key.VirtualKeyCode -eq 39) {
+			cd D:
+			Refresh
 			continue
 		}
 		
 		if ($key.Character -ge 32 -and $key.Character -lt 127) {
-			$matching = Get-MatchingDirectories ($buffer + $key.Character)
-			if (@($matching).Count -gt 0) {
-				$buffer += $key.Character
+			# only complete if it matches some dir
+			if (@(GetMatching ($script:buffer + $key.Character) $dirs).Count -gt 0) {
+				$script:buffer += $key.Character
 			}
 		}
 	}
 	
-	foreach ($i in 0..$LastHeight) {
+	foreach ($i in 1..($script:MaxListCount + 2)) {
 		$x = $rui.CursorPosition
 		# weird hack, dunno why spaces don't work
 		PadLine ">" -NoNewLine
