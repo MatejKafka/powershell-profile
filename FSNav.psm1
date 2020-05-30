@@ -1,4 +1,11 @@
+# Require -Modules Count
+
+Set-StrictMode -Version Latest
+
 # hacked together, needs rewrite
+
+
+$IGNORED_DIRECTORIES = @("`$RECYCLE.BIN", "System Volume Information")
 
 
 Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
@@ -35,7 +42,7 @@ function PrintDirectoryList($baseCursor, $matching) {
 			PadLine $_ -ForegroundColor "#9999C9"
 			$CurrentHeight += 1
 		}
-		if (@($matching).Count -gt $script:MaxListCount) {
+		if ((count $matching) -gt $script:MaxListCount) {
 			PadLine -ForegroundColor "#666696" (" ╚⸨ " + "... (+$($matching.Count - $script:MaxListCount))")
 			return
 		}
@@ -76,14 +83,26 @@ function DeleteNext($buffer, $items) {
 	if ($buffer -eq "") {
 		return ""
 	}
-	if (@($items).Count -eq 0) {
+	if ((count $items) -eq 0) {
 		return ""
 	}
 	
+	$origCount = count (GetMatching $buffer $items)
 	do {
 		$buffer = $buffer.Substring(0, $buffer.Length - 1)
-	} while (@(GetMatching $buffer $items).Count -eq $c)
+	} while ((count (GetMatching $buffer $items)) -eq $origCount)
+	
 	return $buffer
+}
+
+function GetDirectories {
+	# some locations, like Registry don't have directories and Get-ChildItem reflects that in its params
+	$dirs = if ((Get-Command Get-ChildItem).Parameters.ContainsKey("Directory")) {
+		Get-ChildItem -Name -Force -Directory
+	} else {
+		Get-ChildItem -Name -Force
+	}
+	return $dirs | where {$_ -notin $IGNORED_DIRECTORIES}
 }
 
 function GetMatching($prefix, $strings) {
@@ -115,7 +134,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	}
 	
 	while ($true) {
-		$dirs = ls -Force -Directory | select -ExpandProperty Name
+		$dirs = GetDirectories
 		$matching = GetMatching $script:buffer $dirs
 	
 		if ($script:buffer -ne "") {
@@ -123,9 +142,9 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 			$matching = GetMatching $script:buffer $dirs
 		}
 		
-		if ($script:buffer -in $matching -and $matching.Count -eq 1) {
+		if ($script:buffer -in $matching -and (count $matching) -eq 1) {
 			# we have single exact match
-			cd $script:buffer
+			cd $matching
 			Refresh
 			continue
 		}
@@ -144,7 +163,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		
 		# Backspace
 		if ($key.VirtualKeyCode -eq 8) {
-			$script:buffer = DeleteNext $script:buffer
+			$script:buffer = DeleteNext $script:buffer $dirs
 			continue
 		}
 		
@@ -152,7 +171,8 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		if ($key.VirtualKeyCode -eq 13) {
 			if ($script:buffer -in $matching) {
 				# we have exact match
-				cd $script:buffer
+				# do not use buffer directly, as it's probably lowercase
+				cd ($matching -eq $script:buffer)[0]
 				Refresh
 				continue
 			}	
@@ -179,9 +199,16 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 			continue
 		}
 		
+		# Down arrow
+		if ($key.VirtualKeyCode -eq 40) {
+			cd HKCU:
+			Refresh
+			continue
+		}
+		
 		if ($key.Character -ge 32 -and $key.Character -lt 127) {
 			# only complete if it matches some dir
-			if (@(GetMatching ($script:buffer + $key.Character) $dirs).Count -gt 0) {
+			if ((count (GetMatching ($script:buffer + $key.Character) $dirs)) -gt 0) {
 				$script:buffer += $key.Character
 			}
 		}

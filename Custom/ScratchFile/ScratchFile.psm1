@@ -1,5 +1,7 @@
 #Requires -Modules Invoke-Notepad
 
+$SAVE_TO_HISTORY = $false
+
 $script:_LastTmpFile = $null
 $script:_LastTmpContent = $null
 
@@ -24,13 +26,15 @@ Function Invoke-Scratch([switch]$ContinueLast) {
 		try {
 			# append export declaration to end of file
 			echo "`n`nExport-ModuleMember -Function * -Cmdlet * -Variable * -Alias *" >> $temp
-			Import-Module -Scope Global $temp
+			Import-Module -Force -Scope Global $temp
 		} finally {
 			# restore original content
 			Set-Content $temp $content
 		}
 		
-		[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory($content)
+		if ($SAVE_TO_HISTORY) {
+			[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory($content)
+		}
 	} else {
 		Write-Host -ForegroundColor Red "Scratch file is empty, ignoring...."
 	}
