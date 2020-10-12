@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $IGNORED_DIRECTORIES = @("`$RECYCLE.BIN", "System Volume Information")
 
 
-Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
+Set-PSReadLineKeyHandler -Key "Alt+UpArrow" -ScriptBlock {
 	cd ..
 	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
 }
@@ -221,6 +221,8 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		$rui.CursorPosition = $x
 		Write-Host " "
 	}
+	
+	[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory("cd '$(pwd)'")
 	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
 }
 

@@ -1,22 +1,80 @@
 #Requires -Modules Wait-FileChange, Format-TimeSpan, Invoke-Notepad, ScratchFile
 
-Import-Module D:\_\Pkg\app\Pkg.psm1
+New-Alias ipy ipython
+# where is masked by builtin alias for Where-Object
+New-Alias which where.exe
+New-Alias py python3.exe
+New-Alias python python3.exe
+
+Remove-Alias rm
+New-Alias rm Remove-ItemSafely
+New-Alias rmp Remove-Item
 
 New-Alias npp Invoke-Notepad
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
 New-Alias env Update-EnvVar
 New-Alias venv Activate-Venv
+New-Alias todo New-Todo
 
 
-function uip {
-	Get-VMIPAddress "ubuntu"
+function cal {
+	Set-Notebook CALENDAR
 }
 
-function vm_ubuntu {
-	$IP = Get-VMIPAddress "ubuntu"
-	Set-ItemProperty "HKCU:\Software\Martin Prikryl\WinSCP 2\Sessions\vm_ubuntu" -Name "HostName" -Value $IP
+function history-npp {
+	npp (Get-PSReadLineOption).HistorySavePath
+}
+
+
+function Test-UdpConnection {
+	param(
+			[Parameter(Mandatory)]
+			[string]
+		$Host_,
+			[Parameter(Mandatory)]
+			[int]
+		$Port,
+			[string]
+		$Message = "test"
+	)
+
+	$sock = New-Object System.Net.Sockets.UdpClient
+	$enc = New-Object System.Text.ASCIIEncoding
+	$bytes = $enc.GetBytes($Message)
+	$sock.Connect($Host_, $Port)
+	[void]$sock.Send($bytes, $bytes.Length)
+	$sock.Close()
+}
+
+
+function pc {
+	# empty password
+	$pw = New-Object System.Security.SecureString
+	$cred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList @("admin", $pw)
+	Enter-PSSession pc.mahl25 -Credential $cred -UseSSL
+}
+
+
+function kali-ip {
+	Get-VMIPAddress "kali"
+}
+
+function ip {
+	Get-NetIPAddress
+		| ? {$_.AddressFamily -eq "IPv4" -and $_.SuffixOrigin -in @("Dhcp", "Manual") `
+			-and !$_.InterfaceAlias.StartsWith("vEthernet")}
+		| select InterfaceAlias, IPAddress
+}
+
+function vm_kali {
+	$IP = Get-VMIPAddress "kali"
+	Set-ItemProperty "HKCU:\Software\Martin Prikryl\WinSCP 2\Sessions\vm_kali" -Name "HostName" -Value $IP
 	echo $IP
+}
+
+function oris {
+	Get-OrisEnrolledEvents | Format-OrisEnrolledEvents
 }
 
 
@@ -39,12 +97,6 @@ Function Activate-Venv([string]$VenvName) {
 }
 
 
-Function mktxt($filename) {
-	New-Item $filename
-	Invoke-Notepad $filename
-}
-
-
 Function Get-ProcessHistory($Last = 10) {
 	Get-WinEvent Security |
 		where id -eq 4688 |
@@ -60,10 +112,15 @@ function Update-EnvVar {
 		$VarName
 	)
 	
-	[Environment]::SetEnvironmentVariable($VarName,
-		[Environment]::GetEnvironmentVariable($VarName, [EnvironmentVariableTarget]::Machine) +
-		[IO.Path]::PathSeparator +
-		[Environment]::GetEnvironmentVariable($VarName, [EnvironmentVariableTarget]::User))
+	$Machine = [Environment]::GetEnvironmentVariable($VarName, [EnvironmentVariableTarget]::Machine)
+	$User = [Environment]::GetEnvironmentVariable($VarName, [EnvironmentVariableTarget]::User)
+	
+	$Value = if ($null -eq $Machine -or $null -eq $User) {
+		[string]($Machine + $User)
+	} else {
+		$Machine + [IO.Path]::PathSeparator + $User
+	}
+	[Environment]::SetEnvironmentVariable($VarName, $Value)
 }
 
 
