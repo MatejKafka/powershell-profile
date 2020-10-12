@@ -1,11 +1,17 @@
-#Requires -Modules Format-TimeSpan, Write-HostLineEnd, Pansies
+#Requires -Modules Format-TimeSpan, Write-HostLineEnd, Pansies, posh-git
 param(
 		[Parameter(Mandatory)]
-		[DateTime]
-		# should be intialized at the start of $PROFILE using `$ProfileStartTime = Get-Date`
-	$ProfileStartTime
+		[HashTable]
+	$Times
 )
 
+
+Set-PSReadLineKeyHandler -Key Shift+UpArrow -Function HistorySearchBackward
+Set-PSReadLineKeyHandler -Key Shift+DownArrow -Function HistorySearchForward
+Set-PSReadLineOption -HistorySearchCursorMovesToEnd 
+
+# enable fish-like autocompletion
+Set-PSReadLineOption -PredictionSource History
 
 # autocomplete should offer all options, not fill in the first one
 Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
@@ -22,8 +28,7 @@ $global:LastExitCode = 0
 # otherwise python venv would break our fancy Prompt
 $Env:VIRTUAL_ENV_DISABLE_PROMPT = $true
 
-$script:StartupTime = $null
-$script:ProfileTime = $null
+$script:FirstPromptTime = $null
 
 
 Function Get-LastCommandStatus {
@@ -67,13 +72,24 @@ Function Get-LastCommandStatus {
 		$StatusStr += Format-TimeSpan $ExecutionTime
 	} else {
 		# we just started up, display startup time
-		if ($script:StartupTime -eq $null) {
-			$script:StartupTime = (Get-Date) - (Get-Process -Id $pid).StartTime
-			$script:ProfileTime = (Get-Date) - $ProfileStartTime
+		if ($script:FirstPromptTime -eq $null) {
+			$script:FirstPromptTime = Get-Date
+			$Times.prompt = $script:FirstPromptTime
 		}
-		$StatusStr += "startup: "
-		$StatusStr += Format-TimeSpan $script:StartupTime
-		$StatusStr += " (profile: " + (Format-TimeSpan $script:ProfileTime) + ")"
+		
+		$LoadStartTime = (Get-Process -Id $pid).StartTime
+		$StartupTime = $script:FirstPromptTime - $LoadStartTime
+		$StatusStr += "startup: " + (Format-TimeSpan $StartupTime)
+		
+		$Sorted = ,@{Name = $null; Value = $LoadStartTime}
+		$Sorted += $Times.GetEnumerator() | sort -Property Value
+		$TimeStrings = @()
+		for ($i = 1; $i -lt $Sorted.Count; $i += 1) {
+			$_ = $Sorted[$i]
+			$TimeStrings += $_.Name + ": " + (Format-TimeSpan ($_.Value - $Sorted[$i - 1].Value))
+		}
+		
+		$StatusStr += " (" +  ($TimeStrings -join ", ") + ")"
 	}
 	
 	return $StatusStr
@@ -118,6 +134,10 @@ Function global:Prompt {
 	# show if we're running with active python venv
 	if ($null -ne $env:VIRTUAL_ENV) {
 		Write-Host "(venv) " -NoNewLine -ForegroundColor $Color
+	}
+	
+	if (Get-GitDirectory) {
+		Write-Host "(git) " -NoNewLine -ForegroundColor $Color
 	}
 	
 	# write prompt itself
