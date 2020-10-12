@@ -2,6 +2,7 @@
 
 $SAVE_TO_HISTORY = $false
 
+$script:_LastNonEmptyTmpFile = $null
 $script:_LastTmpFile = $null
 $script:_LastTmpContent = $null
 
@@ -22,6 +23,7 @@ Function Invoke-Scratch([switch]$ContinueLast) {
 	
 	$content = Get-Content -Raw $temp
 	if ($content -ne $null -and $content.Length -gt 0) {
+		$script:_LastNonEmptyTmpFile = $temp
 		$script:_LastTmpContent = $content
 		try {
 			# append export declaration to end of file
@@ -36,6 +38,9 @@ Function Invoke-Scratch([switch]$ContinueLast) {
 			[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory($content)
 		}
 	} else {
+		if ($null -ne $script:_LastNonEmptyTmpFile) {
+			$script:_LastTmpFile = $script:_LastNonEmptyTmpFile
+		}
 		Write-Host -ForegroundColor Red "Scratch file is empty, ignoring...."
 	}
 }
