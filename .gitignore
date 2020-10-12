@@ -1,8 +1,6 @@
-/profile.ps1
 /Modules/*
 /Custom/Copy-ToVM/*
-/Custom/Invoke-Notepad/*
-/Custom/Oris/*
 /Custom/Invoke-WebServer/usb_webserver/apache2/logs/*
 /Custom/Invoke-WebServer/usb_webserver/mysql/data/*
 /links
+/functions_custom.ps1

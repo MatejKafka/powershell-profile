@@ -1,4 +1,4 @@
-#Requires -Modules Wait-FileChange, Format-TimeSpan, Invoke-Notepad, ScratchFile
+#Requires -Modules Wait-FileChange, Format-TimeSpan, ScratchFile, Oris, Recycle, Invoke-Notepad
 
 New-Alias ipy ipython
 # where is masked by builtin alias for Where-Object
@@ -10,13 +10,12 @@ Remove-Alias rm
 New-Alias rm Remove-ItemSafely
 New-Alias rmp Remove-Item
 
-New-Alias npp Invoke-Notepad
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
 New-Alias env Update-EnvVar
 New-Alias venv Activate-Venv
 New-Alias todo New-Todo
-
+New-Alias npp Invoke-Notepad
 
 function cal {
 	Set-Notebook CALENDAR
@@ -25,7 +24,6 @@ function cal {
 function history-npp {
 	npp (Get-PSReadLineOption).HistorySavePath
 }
-
 
 function Test-UdpConnection {
 	param(
@@ -47,30 +45,11 @@ function Test-UdpConnection {
 	$sock.Close()
 }
 
-
-function pc {
-	# empty password
-	$pw = New-Object System.Security.SecureString
-	$cred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList @("admin", $pw)
-	Enter-PSSession pc.mahl25 -Credential $cred -UseSSL
-}
-
-
-function kali-ip {
-	Get-VMIPAddress "kali"
-}
-
 function ip {
 	Get-NetIPAddress
 		| ? {$_.AddressFamily -eq "IPv4" -and $_.SuffixOrigin -in @("Dhcp", "Manual") `
 			-and !$_.InterfaceAlias.StartsWith("vEthernet")}
 		| select InterfaceAlias, IPAddress
-}
-
-function vm_kali {
-	$IP = Get-VMIPAddress "kali"
-	Set-ItemProperty "HKCU:\Software\Martin Prikryl\WinSCP 2\Sessions\vm_kali" -Name "HostName" -Value $IP
-	echo $IP
 }
 
 function oris {
