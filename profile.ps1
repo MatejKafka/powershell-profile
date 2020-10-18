@@ -9,9 +9,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 $PSDefaultParameterValues["*:Encoding"] = "utf8"
-$ProgressPreference = "SilentlyContinue"
+# $ProgressPreference = "SilentlyContinue"
 
 
+# to support symlinked profile path
 $CONFIG_DIR = Split-Path (Get-Item $PSCommandPath).Target
 # add custom module directory
 $env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path $CONFIG_DIR"\Custom")
@@ -21,10 +22,10 @@ $_Times.setup = Get-Date
 # RGB colors for Write-Host
 Import-Module Pansies
 # custom functions
-. $CONFIG_DIR\functions.ps1
+Import-Module $CONFIG_DIR\functions.psm1 -DisableNameChecking
 # custom private functions, not commited to git
-if (Test-Path $CONFIG_DIR\functions_custom.ps1) {
-	. $CONFIG_DIR\functions_custom.ps1
+if (Test-Path $CONFIG_DIR\functions_custom.psm1) {
+	Import-Module $CONFIG_DIR\functions_custom.psm1 -DisableNameChecking
 }
 # native command arg completers
 . $CONFIG_DIR\arg_completer.ps1

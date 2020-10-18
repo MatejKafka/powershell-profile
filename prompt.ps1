@@ -22,7 +22,7 @@ Set-PSReadLineOption -ExtraPromptLineCount 1
 
 
 # written by our overriden version of Out-Default
-$global:_LastCmdOutputTypes = @()
+$script:_LastCmdOutputTypes = @()
 # without setting this, drawing prompt would fail
 $global:LastExitCode = 0
 # otherwise python venv would break our fancy Prompt
@@ -45,11 +45,11 @@ Function Get-LastCommandStatus {
 	$StatusStr = ""
 
 	# render output type of previous command, unless it resulted in an error
-	if ($global:_LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
-		if ($global:_LastCmdOutputTypes.Length -gt 1) {
-			$StatusStr += "[" + $global:_LastCmdOutputTypes.Length + "]"
+	if ($script:_LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+		if ($script:_LastCmdOutputTypes.Length -gt 1) {
+			$StatusStr += "[" + $script:_LastCmdOutputTypes.Length + "]"
 		}
-		$StatusStr += $global:_LastCmdOutputTypes[0].ToString() + " | "
+		$StatusStr += $script:_LastCmdOutputTypes[0].ToString() + " | "
 	}
 
 	# print exit code if error occurred
@@ -146,7 +146,7 @@ Function global:Prompt {
 	# reset exit code
 	$global:LastExitCode = 0
 	# reset last output types
-	$global:_LastCmdOutputTypes = @()
+	$script:_LastCmdOutputTypes = @()
 	return "> "
 }
 
@@ -170,7 +170,7 @@ function global:Out-Default {
 	process {
 		$steppablePipeline.Process($_)
 		if ($null -ne $_) {
-			$global:_LastCmdOutputTypes += $_.GetType()
+			$script:_LastCmdOutputTypes += $_.GetType()
 		}
 	}
 

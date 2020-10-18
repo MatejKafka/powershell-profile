@@ -57,7 +57,7 @@ function oris {
 }
 
 
-Function Activate-Venv([string]$VenvName) {
+function Activate-Venv([string]$VenvName) {
 	if ("" -eq $VenvName) {
 		$path = ".\venv\Scripts\Activate.ps1"
 	} else {
@@ -76,7 +76,7 @@ Function Activate-Venv([string]$VenvName) {
 }
 
 
-Function Get-ProcessHistory($Last = 10) {
+function Get-ProcessHistory($Last = 10) {
 	Get-WinEvent Security |
 		where id -eq 4688 |
 		select -First $Last |
@@ -103,7 +103,7 @@ function Update-EnvVar {
 }
 
 
-#Function Pause {
+#function Pause {
 #	Write-Host -NoNewLine 'Press any key to continue...'
 #	$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 #}
@@ -114,7 +114,7 @@ function Update-EnvVar {
 # }
 
 
-Function Update-PowerShell([switch]$Stable) {
+function Update-PowerShell([switch]$Stable) {
 	$InstallerScript = Invoke-RestMethod https://aka.ms/install-powershell.ps1
 	$Installer = [ScriptBlock]::Create($InstallerScript)
 	if ($Stable) {
@@ -126,8 +126,11 @@ Function Update-PowerShell([switch]$Stable) {
 }
 
 
-Function Get-CmdExecutionTime($index=-1) {
+function Get-CmdExecutionTime($index=-1) {
 	$cmd = (Get-History)[$index]
 	$executionTime = $cmd.EndExecutionTime - $cmd.StartExecutionTime
 	return Format-TimeSpan $executionTime
 }
+
+
+Export-ModuleMember -Function * -Cmdlet * -Alias *
