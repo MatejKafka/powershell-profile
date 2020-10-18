@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $IGNORED_DIRECTORIES = @("`$RECYCLE.BIN", "System Volume Information")
 
 
-Set-PSReadLineKeyHandler -Key "Alt+UpArrow" -ScriptBlock {
+Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
 	cd ..
 	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
 }
