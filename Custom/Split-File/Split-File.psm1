@@ -1,3 +1,8 @@
+function Resolve-VirtualPath {
+	param([Parameter(Mandatory)]$Path)
+	return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+}
+
 <#
 .Synopsis
 Splits a file to smaller files with choosable size.
@@ -42,7 +47,7 @@ function Split-File([STRING] $Path, [INT64] $Newsize = 100MB)
 	$REMAINDER = $Newsize % $MAXVALUE
 	if ($PASSES -gt 0) { $BUFSIZE = $MAXVALUE } else { $BUFSIZE = $REMAINDER }
 
-	$OBJREADER = New-Object System.IO.BinaryReader([System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
+	$OBJREADER = New-Object System.IO.BinaryReader([System.IO.File]::Open((Resolve-Path $Path), [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
 	[Byte[]]$BUFFER = New-Object Byte[] $BUFSIZE
 	$NUMFILE = 1
 
@@ -119,13 +124,13 @@ function Join-File([STRING] $Path) {
 		return
 	}
 
-	$OBJWRITER = New-Object System.IO.BinaryWriter([System.IO.File]::Create($Path))
+	$OBJWRITER = New-Object System.IO.BinaryWriter([System.IO.File]::Create((Resolve-VirtualPath $Path)))
 
 	if ($PSVersionTable.PSVersion.Major -ge 3)
 	{ # method CopyTo() is implemented in .Net 4.x first
 		$OBJARRAY | ForEach-Object {
 			"Appending $_ to $Path."
-			$OBJREADER = New-Object System.IO.BinaryReader([System.IO.File]::Open($_, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
+			$OBJREADER = New-Object System.IO.BinaryReader([System.IO.File]::Open((Resolve-Path $_), [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
 
 			$OBJWRITER.BaseStream.Position = $OBJWRITER.BaseStream.Length
 			$OBJREADER.BaseStream.CopyTo($OBJWRITER.BaseStream)
@@ -140,7 +145,7 @@ function Join-File([STRING] $Path) {
 
 		$OBJARRAY | ForEach-Object {
 			"Appending $_ to $Path."
-			$OBJREADER = New-Object System.IO.BinaryReader([System.IO.File]::Open($_, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
+			$OBJREADER = New-Object System.IO.BinaryReader([System.IO.File]::Open((Resolve-Path $_), [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
 
 			while ($OBJREADER.BaseStream.Position -lt $OBJREADER.BaseStream.Length)
 			{
