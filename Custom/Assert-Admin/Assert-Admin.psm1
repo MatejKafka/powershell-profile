@@ -3,6 +3,6 @@ Function Assert-Admin {
 	$isAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 	
 	if (-not $isAdmin) {
-		raise "This must be run with administrator privilege."
+		throw "This must be run with administrator privilege."
 	}
 }
