@@ -7,7 +7,7 @@ $WEBSERVER_CONFIG_FILE = $PSScriptRoot + "\usb_webserver\settings\usbwebserver.i
 
 $NGROK_CONFIG = @"
 region: eu
-web_addr: false  # disable web interface
+web_addr: {1}
 
 tunnels:    
     server:
@@ -53,7 +53,11 @@ function Invoke-WebServer {
 			[string]
 		$RootDirectory,
 			[switch]
-		$Public = $false,
+		$Public,
+			# if True, web interface will be available at localhost:4040
+			#  to inspect and modify incoming requests
+			[switch]
+		$WebInterface,
 			[uint16]
 		$Port = 8000
 	)
@@ -69,7 +73,8 @@ function Invoke-WebServer {
 	try {
 		if ($Public) {
 			# write ngrok config
-			$NGROK_CONFIG -f $Port | Out-File $NGROK_CONFIG_FILE
+			$WebInterfaceAddr = if ($WebInterface) {"localhost:4040"} else {"false"}
+			$NGROK_CONFIG -f @($Port, $WebInterfaceAddr) | Out-File $NGROK_CONFIG_FILE
 			# start ngrok
 			ngrok start ("-config=" + (Resolve-Path $NGROK_CONFIG_FILE)) server
 		} else {
