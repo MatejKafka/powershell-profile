@@ -16,6 +16,7 @@ New-Alias env Update-EnvVar
 New-Alias venv Activate-Venv
 New-Alias todo New-Todo
 New-Alias npp Invoke-Notepad
+New-Alias e Push-ExplorerLocation
 
 function cal {
 	Set-Notebook CALENDAR
@@ -23,6 +24,79 @@ function cal {
 
 function history-npp {
 	npp (Get-PSReadLineOption).HistorySavePath
+}
+
+function make {
+	wsl -- make
+}
+
+function manl {
+	wsl -- man @Args
+}
+
+function Push-ExplorerLocation {
+	$Dirs = Get-ExplorerDirectories
+	$Selected = Read-HostListChoice $Dirs -Prompt "Select directory to cd to:" `
+			-NoInputMessage "No explorer windows found."
+	Push-Location $Selected
+}
+
+function Test-SshConnection {
+	param(
+			[Parameter(Mandatory)]
+			[string]
+		$Login,
+			[ValidateScript({Test-Path $_})]
+			[string]
+		$KeyFilePath
+	)
+	
+	$OrigLEC = $LastExitCode
+	$Arg = if ([string]::IsNullOrEmpty($KeyFilePath)) {@()} else {@("-i", $KeyFilePath)}
+	try {
+		$null = $(ssh $Login -o PasswordAuthentication=no @Arg exit) 2>&1
+		return $LastExitCode -eq 0
+	} catch {
+		return $False
+	} finally {
+		$LastExitCode = $OrigLEC
+	}
+}
+
+function Copy-SshId {
+	param(
+			[Parameter(Mandatory)]
+			[string]
+		$Login,
+			[Parameter(Mandatory)]
+			[ValidateScript({Test-Path $_})]
+			[string]
+		$KeyFilePath
+	)
+	
+	$PubKeyPath = if ([IO.Path]::GetExtension($KeyFilePath) -eq "") {
+		$KeyFilePath + ".pub"
+	} else {
+		$KeyFilePath
+	}
+	
+	$KeyFilePath = Resolve-Path $KeyFilePath
+	
+	Write-Verbose "Testing if key is already installed..."
+	if (Test-SSHConnection $Login $KeyFilePath) {
+		return "Key already installed."
+	}
+
+	Write-Verbose "Installing key..."
+	Get-Content $PubKeyPath | ssh $Login "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+	if ($LastExitCode -gt 0) {
+		throw "Could not install public key for '$Login'."
+	}
+	Write-Verbose "Public key successfully installed for '$Login', trying to log in..."
+	if (Test-SSHConnection $Login $KeyFilePath) {
+		return "Key successfully installed."
+	}
+	throw "Key installation failed."
 }
 
 function Test-UdpConnection {

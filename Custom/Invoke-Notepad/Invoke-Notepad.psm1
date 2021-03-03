@@ -1,8 +1,5 @@
 #Requires -Modules Wait-FileChange
 
-$NOTEPAD_PATH = "D:\_\Notepad++\Notepad++.lnk"
-
-
 Function Invoke-Notepad {
 	Param(
 			[Parameter(ValueFromPipeline, Mandatory)]
@@ -11,27 +8,27 @@ Function Invoke-Notepad {
 		$NonModal
 	)
 	
-	if (-not (Test-Path -Type Leaf $Path)) {
-		Read-Host "Provided path does not exist - press Enter to create it"
-		$null = New-Item $Path
+	$File = if (-not (Test-Path -Type Leaf $Path)) {
+		$null = Read-Host "Provided path does not exist - press Enter to create it"
+		New-Item $Path
+	} else {
+		Get-Item $Path
 	}
-	
-	$Path = Resolve-Path $Path
 	
 	if ($nonModal) {
 		# start in a normal window
-		& $NOTEPAD_PATH $Path
+		& notepad++.exe $File
 		return
 	}
 	
 	# passing -multiInst and -nosession allows us to open
 	#  separate window in case some tabs are already open
-	$nppProc = Start-Process -PassThru $NOTEPAD_PATH `
-			-ArgumentList @("-multiInst", "-nosession", "-notabbar", $Path)
+	$nppProc = Start-Process notepad++.exe -PassThru -UseNewEnvironment `
+			-ArgumentList "-multiInst -nosession -notabbar `"$File`""
 	
 	try {
 		#$nppProc | Wait-Process
-		$null = Wait-FileChange $Path {$nppProc.HasExited}
+		$null = Wait-FileChange $File {$nppProc.HasExited}
 	} finally {
 		Stop-Process $nppProc
 	}

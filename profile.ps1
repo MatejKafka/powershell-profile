@@ -8,14 +8,19 @@ Set-StrictMode -Version Latest
 # unfortunately, this only works for cmdlets and functions, not native commands
 $ErrorActionPreference = "Stop"
 $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
-$PSDefaultParameterValues["*:Encoding"] = "utf8"
-# $ProgressPreference = "SilentlyContinue"
+# this shouldn't be necessary anymore
+#$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
 
 # to support symlinked profile path
-$CONFIG_DIR = Split-Path (Get-Item $PSCommandPath).Target
+$CONFIG_DIR = Get-Item $PSCommandPath | % {if ($null -ne $_.Target) {$_.Target} else {$_}} | Split-Path
+$DATA_DIR = Resolve-Path $CONFIG_DIR\..\data
 # add custom module directory
 $env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path $CONFIG_DIR"\Custom")
+# set path where command history is saved
+Set-PSReadLineOption -HistorySavePath (Join-Path $DATA_DIR "ConsoleHost_history.txt")
+# set database path for ZLocation
+$env:PS_ZLOCATION_DATABASE_PATH = Join-Path $DATA_DIR "z-location.db"
 
 $_Times.setup = Get-Date
 
