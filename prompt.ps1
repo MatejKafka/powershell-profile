@@ -131,13 +131,25 @@ Function global:Prompt {
 	Write-Host ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
 	Write-Host  "╚╣ " -NoNewLine -ForegroundColor $Color
 	
-	# show if we're running with active python venv
-	if ($null -ne $env:VIRTUAL_ENV) {
-		Write-Host "(venv) " -NoNewLine -ForegroundColor $Color
-	}
-	
-	if (Get-GitDirectory) {
-		Write-Host "(git) " -NoNewLine -ForegroundColor $Color
+	if (Test-Path -Type Container .) {
+		# show if we're running with active python venv
+		if ($null -ne $env:VIRTUAL_ENV) {
+			Write-Host "(venv) " -NoNewLine -ForegroundColor $Color
+		}
+		
+		# show if we're inside a git repository
+		$GitDir = Get-GitDirectory
+		if ($GitDir) {
+			$GitStr = try {
+				$RefStr = cat (Join-Path $GitDir "./HEAD")
+				# "ref: refs/heads/".Length
+				$BranchName = $RefStr.Substring(16)
+				"(git:" + $BranchName + ")"
+			} catch {"(git)"}
+			Write-Host ($GitStr + " ") -NoNewLine -ForegroundColor $Color
+		}
+	} else {
+		Write-Host "(X) " -NoNewLine -ForegroundColor "Red"
 	}
 	
 	# write prompt itself
@@ -151,6 +163,15 @@ Function global:Prompt {
 }
 
 
+<#
+	This override allows us to capture types of all output objects and display them in prompt.
+	
+	ISSUE: PowerShell internally sets $_ based on success of last command;
+		 this override contains some commands, so we'll lose the success status of previous
+		 command entered by user, as it's overwritten by status of commands in this function
+		this is tolerable, as prompt sees the correct value of $? and changes color based on it,
+		so user doesn't really need to access $? from prompt (and it works as expected in scripts)
+#>
 function global:Out-Default {
 	param(
 		[switch]
