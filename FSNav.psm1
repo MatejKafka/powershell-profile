@@ -95,14 +95,25 @@ function DeleteNext($buffer, $items) {
 	return $buffer
 }
 
-function GetDirectories {
+function GetPossibleItems {
 	# some locations, like Registry don't have directories and Get-ChildItem reflects that in its params
 	$dirs = if ((Get-Command Get-ChildItem).Parameters.ContainsKey("Directory")) {
 		Get-ChildItem -Name -Force -Directory
+		ls -File -Filter "./*.lnk" | Select-Object -ExpandProperty Name
 	} else {
 		Get-ChildItem -Name -Force
 	}
 	return $dirs | where {$_ -notin $IGNORED_DIRECTORIES}
+}
+
+function SelectItem($Item) {
+	if (Test-Path -Type Container $Item) {
+		# use -LiteralPath, otherwise "+" and "-" have specific handling
+		cd -LiteralPath $Item
+	} else {
+		$Lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Resolve-Path $Item))
+		cd -LiteralPath $Lnk.TargetPath
+	}
 }
 
 function GetMatching($prefix, $strings) {
@@ -111,6 +122,7 @@ function GetMatching($prefix, $strings) {
 
 $script:baseCursor = $null
 $script:buffer = $null
+
 Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	$script:buffer = ""
 	$script:baseCursor = $rui.CursorPosition
@@ -134,7 +146,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	}
 	
 	while ($true) {
-		$dirs = GetDirectories
+		$dirs = GetPossibleItems
 		$matching = GetMatching $script:buffer $dirs
 	
 		if ($script:buffer -ne "") {
@@ -144,7 +156,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		
 		if ($script:buffer -in $matching -and (count $matching) -eq 1) {
 			# we have single exact match
-			cd $matching
+			SelectItem $matching
 			Refresh
 			continue
 		}
@@ -172,7 +184,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 			if ($script:buffer -in $matching) {
 				# we have exact match
 				# do not use buffer directly, as it's probably lowercase
-				cd ($matching -eq $script:buffer)[0]
+				SelectItem ($matching -eq $script:buffer)[0]
 				Refresh
 				continue
 			}	

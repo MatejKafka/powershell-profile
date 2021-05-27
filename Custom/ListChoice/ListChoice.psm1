@@ -2,14 +2,15 @@ function Read-HostListChoice {
 	[CmdletBinding()]
 	param(
 			[Parameter(Mandatory)]
-			[string[]]
 		$Choices,
 			[string]
 		$Message = $null,
 			[string]
 		$Prompt = "Enter your choice",
 			[string]
-		$NoInputMessage = "No inputs provided, cannot choose."
+		$NoInputMessage = "No inputs provided, cannot choose.",
+			[switch]
+		$NoAutoSelect
 	)
 	
 	if (@($Choices).Count -eq 0) {
@@ -26,7 +27,7 @@ function Read-HostListChoice {
 		$i += 1
 	}
 	
-	if ($i -eq 1) {
+	if ($i -eq 1 -and -not $NoAutoSelect) {
 		Write-Host "Automatically selected only possible option: '$Choices'."
 		return $Choices
 	}

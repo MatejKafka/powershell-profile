@@ -1,4 +1,5 @@
 #Requires -Modules Wait-FileChange, Format-TimeSpan, ScratchFile, Oris, Recycle, Invoke-Notepad
+Set-StrictMode -Version Latest
 
 New-Alias ipy ipython
 # where is masked by builtin alias for Where-Object
@@ -27,11 +28,33 @@ function history-npp {
 }
 
 function make {
-	wsl -- make
+	wsl -- make @Args
 }
 
 function manl {
 	wsl -- man @Args
+}
+
+function Sleep-Computer {
+	Add-Type -AssemblyName System.Windows.Forms
+	$null = [System.Windows.Forms.Application]::SetSuspendState("Suspend", $false, $false)
+}
+
+class _CwdLnkShortcuts : System.Management.Automation.IValidateSetValuesGenerator {
+    [String[]] GetValidValues() {
+        return ls -File -Filter "./*.lnk" | Select-Object -ExpandProperty Name
+    }
+}
+
+function lnk {
+	param(
+			[Parameter(Mandatory)]
+			[ValidateSet([_CwdLnkShortcuts])]
+			[string]
+		$LnkPath
+	)
+	$Lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Resolve-Path $LnkPath))
+	cd -LiteralPath $Lnk.TargetPath
 }
 
 function Push-ExplorerLocation {
