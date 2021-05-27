@@ -122,7 +122,7 @@ Function global:Prompt {
 		# render previous command status
 		Get-LastCommandStatus $ErrorOccurred $global:LastExitCode
 	} else {
-		"" # should be empty, as sometimes I rerender prompt in same place, which should keep previous time
+		"" # should be empty, as sometimes we rerender prompt in same place, which should keep previous time
 	}
 	Write-HostLineEnd ($StatusStr + " ╠╗") $Color -dy -1
 	
