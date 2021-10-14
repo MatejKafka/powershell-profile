@@ -1,16 +1,31 @@
-$VirtualPath = $PSScriptRoot + "\todos.json"
-if (-not (Test-Path $VirtualPath)) {
-	New-Item $VirtualPath
+$script:TODO_PATH = $null
+$script:TODOS = $null
+
+
+function CheckInit {
+	if ($null -eq $script:TODO_PATH) {
+		throw "Called a function from the TODO module without initializing it first"
+	}
 }
 
-$TODO_PATH = Resolve-Path $VirtualPath
-$Todos = [Collections.ArrayList]@(Get-Content $TODO_PATH | ConvertFrom-Json)
-
-
-function Flush-Todo {
-	ConvertTo-Json $script:Todos | Set-Content $TODO_PATH
+function FlushTodo {
+	CheckInit
+	ConvertTo-Json $script:TODOS | Set-Content $script:TODO_PATH
 }
 
+function Initialize-Todo {
+	param(
+			[Parameter(Mandatory)]
+			[string]
+		$TodoFilePath
+	)
+	
+	if (-not (Test-Path $TodoFilePath)) {
+		New-Item $TodoFilePath
+	}
+	$script:TODO_PATH = Resolve-Path $TodoFilePath
+	$script:TODOS = [Collections.ArrayList]@(Get-Content $script:TODO_PATH | ConvertFrom-Json)
+}
 
 function New-Todo {
 	param(
@@ -19,14 +34,16 @@ function New-Todo {
 		$TodoText
 	)
 	
-	$null = $script:Todos.add($TodoText)
-	Flush-Todo
+	CheckInit
+	$null = $script:TODOS.add($TodoText)
+	FlushTodo
 	
-	return "Added TODO (current count: $($Todos.Count))."
+	return "Added TODO (current count: $($script:TODOS.Count))."
 }
 
 function Get-Todo {
-	for ($i = 0; $i -lt $script:Todos.Count; $i++) {
+	CheckInit
+	for ($i = 0; $i -lt $script:TODOS.Count; $i++) {
 		[PSCustomObject]@{
 			Index = $i
 			Todo = $script:Todos[$i]
@@ -66,9 +83,10 @@ function Remove-Todo {
 		$TodoIndex
 	)
 	
-	$Todo = $script:Todos[$TodoIndex]
-	$null = $script:Todos.removerange($TodoIndex, 1)
-	Flush-Todo
+	CheckInit
+	$Todo = $script:TODOS[$TodoIndex]
+	$null = $script:TODOS.removerange($TodoIndex, 1)
+	FlushTodo
 	echo $Todo
-	return "Removed TODO #${TodoIndex}, $($script:Todos.Count) remaining."
+	return "Removed TODO #${TodoIndex}, $($script:TODOS.Count) remaining."
 }

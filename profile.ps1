@@ -7,6 +7,8 @@ Set-StrictMode -Version Latest
 # stop even on non-critical errors
 # unfortunately, this only works for cmdlets and functions, not native commands
 $ErrorActionPreference = "Stop"
+# show Information log stream
+$InformationPreference = "Continue"
 $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # this shouldn't be necessary anymore
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
@@ -38,7 +40,7 @@ if (Test-Path $CONFIG_DIR\functions_custom.psm1) {
 # reload path from system env
 Update-EnvVar Path
 
-if ($env:SIMPLE_PROMPT -ne $null) {
+if ($null -ne $env:SIMPLE_PROMPT) {
 	return # do not setup custom prompt and banner
 }
 

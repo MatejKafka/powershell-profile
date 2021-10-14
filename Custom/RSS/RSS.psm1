@@ -9,20 +9,32 @@ function OpenUri($Uri) {
 }
 
 
+class RSSSource {
+	[string]$Title
+	[System.Uri]$Uri
+	
+	RSSSource($Title, $Uri) {
+		$this.Title = $Title
+		$this.Uri = $Uri
+	}
+}
 
 class RSSItem {
+	[RSSSource]$RssFeed
 	[string]$Title
 	[string]$Uri
 	[DateTime]$Published
 	
-	RSSItem($Title, $Uri, $Published) {
+	RSSItem($RssFeed, $Title, $Uri, $Published) {
+		$this.RssFeed = $RssFeed
 		$this.Title = $Title
 		$this.Uri = $Uri
 		$this.Published = $Published
 	}
 	
 	[string] ToString () {
-		return $this.Published.ToString("[yyyy-MM-dd] ") + $this.Title
+		$FeedTitleStr = if (${this}?.{RssFeed}?.Title) {$this.RssFeed.Title + ":    "} else {""}
+		return $this.Published.ToString("[yyyy-MM-dd] ") + $FeedTitleStr + $this.Title
 	}
 }
 
@@ -30,12 +42,12 @@ class RSSItem {
 function Get-RSSFeed {
 	param(
 			[Parameter(Mandatory, ValueFromPipeline)]
-			[System.Uri]
-		$Uri
+			[RSSSource]
+		$Source
 	)
 	
 	process {
-		Invoke-RestMethod -Uri $Uri | % {
+		Invoke-RestMethod -Uri $Source.Uri | % {
 			$i = $_;
 			
 			$Title = try {
@@ -47,7 +59,7 @@ function Get-RSSFeed {
 			} catch {$null}
 			$PublishedStr = try {$_.published} catch {$i.pubDate}
 			
-			[RSSItem]::new($Title, $Link, $(if ($PublishedStr) {Get-Date $PublishedStr} else {$null}))
+			[RSSItem]::new($Source, $Title, $Link, $(if ($PublishedStr) {Get-Date $PublishedStr} else {$null}))
 		}
 	}
 }
@@ -67,8 +79,8 @@ function Invoke-RSSItem {
 function Invoke-RSS {
 		param(
 			[Parameter(Mandatory, ValueFromPipeline)]
-			[System.Uri]
-		$Uri,
+			[RSSSource]
+		$Source,
 			[DateTime]
 		$Since,
 			[switch]
@@ -80,11 +92,26 @@ function Invoke-RSS {
 	}
 	
 	process {
-		$Items += Get-RSSFeed $Uri | ? {$Since -eq $null -or $_.Published -gt $Since}
+		$Items += Get-RSSFeed $Source | ? {$Since -eq $null -or $_.Published -gt $Since}
 	}
 	
 	end {
 		Read-HostListChoice $Items -Message "Select an article to open:" -NoAutoSelect:$NoAutoSelect `
 			| Invoke-RSSItem
 	}
+}
+
+function Read-RSSFeedFile {
+	param(
+			[Parameter(Mandatory, ValueFromPipeline)]
+			[string]
+			[ValidateScript({Test-Path -Type Leaf $_})]
+		$FilePath
+	)
+	
+	return Get-Content $FilePath | % {
+		$Title, $Uri = $_ -split ":", 2
+		[RSSSource]::new($Title.Trim(), $Uri.Trim())
+	}
+
 }

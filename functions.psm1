@@ -1,5 +1,12 @@
-#Requires -Modules Wait-FileChange, Format-TimeSpan, ScratchFile, Oris, Recycle, Invoke-Notepad
+#Requires -Modules Wait-FileChange, Format-TimeSpan, ScratchFile, Oris, Recycle, Invoke-Notepad, TODO
 Set-StrictMode -Version Latest
+
+
+$RSS_FEED_FILE = "$PSScriptRoot/../data/rssFeeds.txt"
+$TODO_FILE = "$PSScriptRoot/../data/todos.json"
+
+Initialize-Todo $TODO_FILE
+
 
 New-Alias ipy ipython
 # where is masked by builtin alias for Where-Object
@@ -18,6 +25,33 @@ New-Alias venv Activate-Venv
 New-Alias todo New-Todo
 New-Alias npp Invoke-Notepad
 New-Alias e Push-ExplorerLocation
+New-Alias c Push-ClipboardLocation
+
+function rss($DaysSince = 14) {
+	if (-not (Test-Path $RSS_FEED_FILE)) {
+		throw "The RSS feed file does not exist: '$RSS_FEED_FILE'"
+	}
+	$Since = [DateTime]::Today.AddDays(-$DaysSince)
+	Read-RSSFeedFile $RSS_FEED_FILE | Invoke-RSS -Since $Since -NoAutoSelect
+}
+
+function rss-edit {
+	npp $RSS_FEED_FILE
+}
+
+function Resolve-VirtualPath {
+	param([Parameter(Mandatory)]$Path)
+	return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+}
+
+function code {
+	param(
+			[Parameter(ValueFromPipeline)]
+			[string]
+		$File
+	)
+	& (gcm code -CommandType Application) (Resolve-VirtualPath $File)
+}
 
 function cal {
 	Set-Notebook CALENDAR
@@ -28,7 +62,7 @@ function history-npp {
 }
 
 function make {
-	wsl -- make @Args
+	wsl -- bash -ic "make $Args"
 }
 
 function manl {
@@ -41,9 +75,9 @@ function Sleep-Computer {
 }
 
 class _CwdLnkShortcuts : System.Management.Automation.IValidateSetValuesGenerator {
-    [String[]] GetValidValues() {
-        return ls -File -Filter "./*.lnk" | Select-Object -ExpandProperty Name
-    }
+	[String[]] GetValidValues() {
+		return ls -File -Filter "./*.lnk" | Select-Object -ExpandProperty Name
+	}
 }
 
 function lnk {
@@ -57,11 +91,50 @@ function lnk {
 	cd -LiteralPath $Lnk.TargetPath
 }
 
+class _WifiNames : System.Management.Automation.IValidateSetValuesGenerator {
+	[String[]] GetValidValues() {
+		return ((netsh.exe wlan show profile) -match '\s{2,}:\s') -replace '.*:\s' , ''
+	}
+}
+
+function Get-Wifi {
+	param(
+			[ValidateSet([_WifiNames])]
+			[string]
+		$Name
+	)
+	
+	if ([string]::IsNullOrEmpty($Name)) {
+		return [_WifiNames]::new().GetValidValues() | % {
+			Get-Wifi $_
+		}
+	}
+	
+	$Out = netsh.exe wlan show profile $Name key=clear
+	$PasswordLine = $Out -match ".*    Key Content.*"
+	return [PSCustomObject]@{
+		Name = $Name
+		Authentication = ($Out -match '.*    Authentication.*')[0] -replace '.*:\s', ''
+		Password = if ($PasswordLine) {$PasswordLine[0] -replace '.*:\s', ''} else {$null}
+	}
+}
+
 function Push-ExplorerLocation {
 	$Dirs = Get-ExplorerDirectories
 	$Selected = Read-HostListChoice $Dirs -Prompt "Select directory to cd to:" `
 			-NoInputMessage "No explorer windows found."
 	Push-Location $Selected
+}
+
+function Push-ClipboardLocation {
+	$clip = Get-Clipboard
+	if (Test-Path -Type Container $clip) {
+		Push-Location $clip
+	} elseif (Test-Path -Type Leaf $clip) {
+		Push-Location (Split-Path $clip)
+	} else {
+		throw "Not a valid path"
+	}
 }
 
 function Test-SshConnection {
@@ -122,24 +195,78 @@ function Copy-SshId {
 	throw "Key installation failed."
 }
 
-function Test-UdpConnection {
+function ssh-config {
+	npp $env:HOME\.ssh\config
+}
+
+function Out-Tcp {
 	param(
 			[Parameter(Mandatory)]
 			[string]
-		$Host_,
+		$Host,
 			[Parameter(Mandatory)]
 			[int]
 		$Port,
+			[Parameter(Mandatory, ValueFromPipeline)]
 			[string]
-		$Message = "test"
+		$Message
 	)
+	
+	begin {
+		$sock = New-Object System.Net.Sockets.TcpClient
+		$enc = New-Object System.Text.UTF8Encoding
+		$sock.Connect($Host, $Port)
+		$stream = $sock.GetStream()
+	}
+	process {
+		$bytes = $enc.GetBytes($Message)
+		[void]$stream.Write($bytes, 0, $bytes.Length)
+	}
+	end {$sock.Close()}
+}
 
-	$sock = New-Object System.Net.Sockets.UdpClient
-	$enc = New-Object System.Text.ASCIIEncoding
-	$bytes = $enc.GetBytes($Message)
-	$sock.Connect($Host_, $Port)
-	[void]$sock.Send($bytes, $bytes.Length)
-	$sock.Close()
+function Out-Udp {
+	param(
+			[Parameter(Mandatory)]
+			[string]
+		$Host,
+			[Parameter(Mandatory)]
+			[int]
+		$Port,
+			[Parameter(Mandatory, ValueFromPipeline)]
+			[string]
+		$Message,
+			<# Wait for a reply after each sent packet. Only use on reliable networks,
+			   as this blocks forever in case the reply packet is lost. #>
+			[switch]
+		$WaitForReply,
+			<# Add a newline (\n) to each outgoing packet, and strip a single trailing newline from incoming packets, if present. #>
+			[switch]
+		$Newlines
+	)
+	
+	begin {
+		$sock = New-Object System.Net.Sockets.UdpClient
+		$enc = New-Object System.Text.UTF8Encoding
+		$sock.Connect($Host, $Port)
+		# dummy for receiving, not used anywhere
+		$remoteHost = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
+	}
+	process {
+		if ($Newlines) {$Message = $Message + "`n"}
+		$bytes = $enc.GetBytes($Message)
+		[void]$sock.Send($bytes, $bytes.Length)
+		if ($WaitForReply) {
+			# TODO: handle decoding error
+			$replyStr = $enc.GetString($sock.Receive([ref]$remoteHost))
+			if ($Newlines) {
+				echo ($replyStr -replace "`n$") # remove trailing newline, if any
+			} else {
+				echo $replyStr
+			}
+		}
+	}
+	end {$sock.Close()}
 }
 
 function ip {
@@ -153,6 +280,27 @@ function oris {
 	Get-OrisEnrolledEvents | Format-OrisEnrolledEvents
 }
 
+function BulkRename() {
+	[array]$Items = ls @Args
+	if ($null -eq $Items) {throw "No items to rename"}
+	$TempFile = New-TemporaryFile
+	$Items | select -ExpandProperty Name | Out-File $TempFile
+	npp $TempFile
+	[array]$NewNames = cat $TempFile
+	rm $TempFile
+	if ($Items.Count -ne $NewNames.Count) {
+		throw "You must not add, delete or reorder lines"
+	}
+	
+	$Renamed = 0
+	for ($i = 0; $i -lt $Items.Count; $i++) {
+		if ($Items[$i].Name -ne $NewNames[$i]) {
+			Rename-Item $Items[$i] $NewNames[$i]
+			$Renamed++
+		}
+	}
+	Write-Host "Renamed $Renamed items."
+}
 
 function Activate-Venv([string]$VenvName) {
 	if ("" -eq $VenvName) {

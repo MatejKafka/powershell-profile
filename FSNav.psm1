@@ -17,18 +17,19 @@ Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
 $rui = $Host.UI.RawUI
 
 function PadLine {
-	param($str, [switch]$NoNewLine, $ForegroundColor)
+	param($str, [switch]$NoNewLine, $ForegroundColor, $BackgroundColor)
 	
 	$cursorX = $rui.CursorPosition.X
-	Write-Host ($str + " " * ($Host.UI.RawUI.WindowSize.Width - $str.Length - $cursorX)) `
-		-NoNewLine:$NoNewLine -ForegroundColor $ForegroundColor
+	Write-Host $str -NoNewLine -ForegroundColor $ForegroundColor -BackgroundColor $BackgroundColor
+	Write-Host (" " * ($Host.UI.RawUI.WindowSize.Width - $str.Length - $cursorX)) -NoNewLine:$NoNewLine 
 }
 
 $script:MaxListCount = 20
 
-function PrintDirectoryList($baseCursor, $matching) {
+function PrintItemList($baseCursor, $matching, $searchBuffer) {
 	$rui.CursorPosition = $baseCursor
 	$CurrentHeight = 0
+	$bufferLength = $searchBuffer.Length
 	
 	Write-Host ""
 
@@ -39,7 +40,8 @@ function PrintDirectoryList($baseCursor, $matching) {
 	} else {
 		$matching | select -First $script:MaxListCount | % {
 			Write-Host -NoNewLine -ForegroundColor "#666696" (" ╠⸨ ")
-			PadLine $_ -ForegroundColor "#9999C9"
+			Write-Host -NoNewLine -ForegroundColor "#9999C9" -BackgroundColor "#404078" $_.Substring(0, $bufferLength)
+			PadLine $_.Substring($bufferLength) -ForegroundColor "#9999C9"
 			$CurrentHeight += 1
 		}
 		if ((count $matching) -gt $script:MaxListCount) {
@@ -95,7 +97,7 @@ function DeleteNext($buffer, $items) {
 	return $buffer
 }
 
-function GetPossibleItems {
+function GetAvailableItems {
 	# some locations, like Registry don't have directories and Get-ChildItem reflects that in its params
 	$dirs = if ((Get-Command Get-ChildItem).Parameters.ContainsKey("Directory")) {
 		Get-ChildItem -Name -Force -Directory
@@ -117,7 +119,7 @@ function SelectItem($Item) {
 }
 
 function GetMatching($prefix, $strings) {
-	$strings | where {$_ -like ($prefix + "*")}
+	$strings | where {$_ -like ($prefix + "*")} # StartsWith is case-sensitive, we don't want that
 }
 
 $script:baseCursor = $null
@@ -130,7 +132,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	function Refresh {
 		$script:buffer = ""
 		[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
-		$script:baseCursor = $rui.CursorPosition	
+		$script:baseCursor = $rui.CursorPosition
 	}
 	
 	# create space for list
@@ -146,7 +148,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	}
 	
 	while ($true) {
-		$dirs = GetPossibleItems
+		$dirs = GetAvailableItems
 		$matching = GetMatching $script:buffer $dirs
 	
 		if ($script:buffer -ne "") {
@@ -162,7 +164,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		}
 		
 		[Console]::CursorVisible = $false
-		PrintDirectoryList $script:baseCursor $matching
+		PrintItemList $script:baseCursor $matching $script:buffer
 		PrintCurrentInput $script:baseCursor $script:buffer
 		[Console]::CursorVisible = $true
 	
