@@ -1,4 +1,4 @@
-#Requires -Modules Wait-FileChange, Format-TimeSpan, ScratchFile, Oris, Recycle, Invoke-Notepad, TODO
+#Requires -Modules Wait-FileChange, TimeFormat, ScratchFile, Oris, Recycle, Invoke-Notepad, TODO
 Set-StrictMode -Version Latest
 
 
@@ -39,6 +39,17 @@ function rss-edit {
 	npp $RSS_FEED_FILE
 }
 
+function Get-LatestEmail($HowMany, $ConfigFile) {
+	$Client = Connect-EmailServer -FilePath $ConfigFile
+	$Emails = $Client.Inbox.Fetch([math]::Max($Client.Inbox.Count - $HowMany, 0), -1, [MailKit.MessageSummaryItems]::Envelope)
+	$CurrentDate = Get-Date
+	echo $Emails | % Envelope | % {[pscustomobject]@{
+		Age = Format-Age $_.Date.DateTime $CurrentDate
+		Sender = $_.From.Name ?? $_.From.Address
+		Subject = $_.Subject
+	}}
+}
+
 function Resolve-VirtualPath {
 	param([Parameter(Mandatory)]$Path)
 	return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -48,9 +59,18 @@ function code {
 	param(
 			[Parameter(ValueFromPipeline)]
 			[string]
-		$File
+		$File,
+			[switch]
+		$Wait
 	)
-	& (gcm code -CommandType Application) (Resolve-VirtualPath $File)
+	if (-not (Get-Process Code -ErrorAction Ignore)) {
+		Start-Process 'D:\_\VS Code\Visual Studio Code (VS Code).lnk'
+		do {sleep 0.05}
+		until (Get-Process Code -ErrorAction Ignore)
+	}
+	$ArgList = $Wait ? @("--wait") : @()
+	$ArgList += Resolve-VirtualPath $File
+	$null = & (gcm Code -CommandType Application) @ArgList 2>&1
 }
 
 function cal {
@@ -103,13 +123,13 @@ function Get-Wifi {
 			[string]
 		$Name
 	)
-	
+
 	if ([string]::IsNullOrEmpty($Name)) {
 		return [_WifiNames]::new().GetValidValues() | % {
 			Get-Wifi $_
 		}
 	}
-	
+
 	$Out = netsh.exe wlan show profile $Name key=clear
 	$PasswordLine = $Out -match ".*    Key Content.*"
 	return [PSCustomObject]@{
@@ -146,7 +166,7 @@ function Test-SshConnection {
 			[string]
 		$KeyFilePath
 	)
-	
+
 	$OrigLEC = $LastExitCode
 	$Arg = if ([string]::IsNullOrEmpty($KeyFilePath)) {@()} else {@("-i", $KeyFilePath)}
 	try {
@@ -169,15 +189,15 @@ function Copy-SshId {
 			[string]
 		$KeyFilePath
 	)
-	
+
 	$PubKeyPath = if ([IO.Path]::GetExtension($KeyFilePath) -eq "") {
 		$KeyFilePath + ".pub"
 	} else {
 		$KeyFilePath
 	}
-	
+
 	$KeyFilePath = Resolve-Path $KeyFilePath
-	
+
 	Write-Verbose "Testing if key is already installed..."
 	if (Test-SSHConnection $Login $KeyFilePath) {
 		return "Key already installed."
@@ -211,7 +231,7 @@ function Out-Tcp {
 			[string]
 		$Message
 	)
-	
+
 	begin {
 		$sock = New-Object System.Net.Sockets.TcpClient
 		$enc = New-Object System.Text.UTF8Encoding
@@ -244,7 +264,7 @@ function Out-Udp {
 			[switch]
 		$Newlines
 	)
-	
+
 	begin {
 		$sock = New-Object System.Net.Sockets.UdpClient
 		$enc = New-Object System.Text.UTF8Encoding
@@ -291,7 +311,7 @@ function BulkRename() {
 	if ($Items.Count -ne $NewNames.Count) {
 		throw "You must not add, delete or reorder lines"
 	}
-	
+
 	$Renamed = 0
 	for ($i = 0; $i -lt $Items.Count; $i++) {
 		if ($Items[$i].Name -ne $NewNames[$i]) {
@@ -335,10 +355,10 @@ function Update-EnvVar {
 			[string]
 		$VarName
 	)
-	
+
 	$Machine = [Environment]::GetEnvironmentVariable($VarName, [EnvironmentVariableTarget]::Machine)
 	$User = [Environment]::GetEnvironmentVariable($VarName, [EnvironmentVariableTarget]::User)
-	
+
 	$Value = if ($null -eq $Machine -or $null -eq $User) {
 		[string]($Machine + $User)
 	} else {

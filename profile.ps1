@@ -24,6 +24,9 @@ Set-PSReadLineOption -HistorySavePath (Join-Path $DATA_DIR "ConsoleHost_history.
 # set database path for ZLocation
 $env:PS_ZLOCATION_DATABASE_PATH = Join-Path $DATA_DIR "z-location.db"
 
+# set env:LANG, which makes `git diff` and other originally Linux commands print stuff with correct encoding
+$env:LANG = "C.UTF-8"
+
 $_Times.setup = Get-Date
 
 # RGB colors for Write-Host

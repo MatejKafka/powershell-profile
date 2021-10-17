@@ -1,4 +1,4 @@
-#Requires -Modules Format-TimeSpan, Write-HostLineEnd, Pansies, posh-git
+#Requires -Modules TimeFormat, Write-HostLineEnd, Pansies, posh-git
 param(
 		[Parameter(Mandatory)]
 		[HashTable]
@@ -8,7 +8,7 @@ param(
 
 Set-PSReadLineKeyHandler -Key Shift+UpArrow -Function HistorySearchBackward
 Set-PSReadLineKeyHandler -Key Shift+DownArrow -Function HistorySearchForward
-Set-PSReadLineOption -HistorySearchCursorMovesToEnd 
+Set-PSReadLineOption -HistorySearchCursorMovesToEnd
 
 # enable fish-like autocompletion
 Set-PSReadLineOption -PredictionSource History
@@ -64,7 +64,7 @@ Function Get-LastCommandStatus {
 			$StatusStr += [string]$LastExitCode + " | "
 		}
 	}
-	
+
 	# print run time of last command, or startup time if this is the first time we're rendering prompt
 	$LastCmd = Get-History -Count 1
 	if ($null -ne $LastCmd) {
@@ -76,11 +76,11 @@ Function Get-LastCommandStatus {
 			$script:FirstPromptTime = Get-Date
 			$Times.prompt = $script:FirstPromptTime
 		}
-		
+
 		$LoadStartTime = (Get-Process -Id $pid).StartTime
 		$StartupTime = $script:FirstPromptTime - $LoadStartTime
 		$StatusStr += "startup: " + (Format-TimeSpan $StartupTime)
-		
+
 		$Sorted = ,@{Name = $null; Value = $LoadStartTime}
 		$Sorted += $Times.GetEnumerator() | sort -Property Value
 		$TimeStrings = @()
@@ -88,10 +88,10 @@ Function Get-LastCommandStatus {
 			$_ = $Sorted[$i]
 			$TimeStrings += $_.Name + ": " + (Format-TimeSpan ($_.Value - $Sorted[$i - 1].Value))
 		}
-		
+
 		$StatusStr += " (" +  ($TimeStrings -join ", ") + ")"
 	}
-	
+
 	return $StatusStr
 }
 
@@ -125,18 +125,18 @@ Function global:Prompt {
 		"" # should be empty, as sometimes we rerender prompt in same place, which should keep previous time
 	}
 	Write-HostLineEnd ($StatusStr + " ╠╗") $Color -dy -1
-	
-	
+
+
 	# write horizontal separator
 	Write-Host ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
 	Write-Host  "╚╣ " -NoNewLine -ForegroundColor $Color
-	
+
 	if (Test-Path -Type Container .) {
 		# show if we're running with active python venv
 		if ($null -ne $env:VIRTUAL_ENV) {
 			Write-Host "(venv) " -NoNewLine -ForegroundColor $Color
 		}
-		
+
 		# show if we're inside a git repository
 		$GitDir = Get-GitDirectory
 		if ($GitDir) {
@@ -151,10 +151,10 @@ Function global:Prompt {
 	} else {
 		Write-Host "(X) " -NoNewLine -ForegroundColor "Red"
 	}
-	
+
 	# write prompt itself
 	Write-Host ([string](Get-Location)) -NoNewLine -ForegroundColor $CwdColor
-	
+
 	# reset exit code
 	$global:LastExitCode = 0
 	# reset last output types
@@ -165,7 +165,7 @@ Function global:Prompt {
 
 <#
 	This override allows us to capture types of all output objects and display them in prompt.
-	
+
 	ISSUE: PowerShell internally sets $_ based on success of last command;
 		 this override contains some commands, so we'll lose the success status of previous
 		 command entered by user, as it's overwritten by status of commands in this function
