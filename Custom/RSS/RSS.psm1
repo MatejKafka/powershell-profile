@@ -20,16 +20,18 @@ class RSSSource {
 }
 
 class RSSItem {
-	[RSSSource]$RssFeed
-	[string]$Title
-	[string]$Uri
+	hidden [RSSSource]$RssFeed
+	hidden [string]$Uri
 	[DateTime]$Published
+	[string]$Author
+	[string]$Title
 
 	RSSItem($RssFeed, $Title, $Uri, $Published) {
 		$this.RssFeed = $RssFeed
-		$this.Title = $Title
 		$this.Uri = $Uri
 		$this.Published = $Published
+		$this.Author = ${RssFeed}?.Title ? $RssFeed.Title : ""
+		$this.Title = $Title
 	}
 
 	[string] ToString () {
@@ -43,7 +45,9 @@ function Get-RSSFeed {
 	param(
 			[Parameter(Mandatory, ValueFromPipeline)]
 			[RSSSource]
-		$Source
+		$Source,
+			[datetime]
+		$Since
 	)
 
 	process {
@@ -58,8 +62,11 @@ function Get-RSSFeed {
 				if ($_.{link}?.GetType() -eq [string]) {$_.link} else {$_.link.href}
 			} catch {$null}
 			$PublishedStr = try {$_.published} catch {$i.pubDate}
+			$Published = $PublishedStr ? (Get-Date $PublishedStr) : $null
 
-			[RSSItem]::new($Source, $Title, $Link, $(if ($PublishedStr) {Get-Date $PublishedStr} else {$null}))
+			if ($null -eq $Since -or $Published -gt $Since) {
+				[RSSItem]::new($Source, $Title, $Link, $Published)
+			}
 		}
 	}
 }
@@ -92,7 +99,7 @@ function Invoke-RSS {
 	}
 
 	process {
-		$Items += Get-RSSFeed $Source | ? {$Since -eq $null -or $_.Published -gt $Since}
+		$Items += Get-RSSFeed $Source -Since $Since
 	}
 
 	end {
@@ -112,6 +119,7 @@ function Read-RSSFeedFile {
 	)
 
 	return Get-Content $FilePath | % {
+		if ($_ -match "\s*#.*") {return} # ignore lines starting with #
 		$Title, $Uri = $_ -split ":", 2
 		[RSSSource]::new($Title.Trim(), $Uri.Trim())
 	}

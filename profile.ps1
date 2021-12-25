@@ -43,17 +43,19 @@ if (Test-Path $CONFIG_DIR\functions_custom.psm1) {
 # reload path from system env
 Update-EnvVar Path
 
-if ($null -ne $env:SIMPLE_PROMPT) {
-	return # do not setup custom prompt and banner
-}
-
-Import-Module $CONFIG_DIR\FSNav
 $_Times.imports = Get-Date
 
-& $CONFIG_DIR\banner.ps1
 
-$_Times.banner = Get-Date
-# setup prompt
-. $CONFIG_DIR\prompt.ps1 $_Times
-# setup ZLocation
-Import-Module ZLocation
+# do not setup custom prompt and banner if set
+if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
+	# do not show custom banner (TODO, version, calendar,...) if set
+	if (-not (Test-Path Env:PS_NO_BANNER)) {
+		& $CONFIG_DIR\banner.ps1
+		$_Times.banner = Get-Date
+	}
+	# setup prompt
+	Import-Module $CONFIG_DIR\FSNav
+	. $CONFIG_DIR\prompt.ps1 $_Times
+	# setup ZLocation
+	Import-Module ZLocation
+}

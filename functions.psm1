@@ -22,10 +22,20 @@ New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
 New-Alias env Update-EnvVar
 New-Alias venv Activate-Venv
-New-Alias todo New-Todo
 New-Alias npp Invoke-Notepad
-New-Alias e Push-ExplorerLocation
-New-Alias c Push-ClipboardLocation
+New-Alias e Push-ExternalLocation
+
+function todo([string]$TodoText) {
+	if ([string]::IsNullOrEmpty($TodoText)) {
+		Get-Todo | Format-Todo -Color "#909060"
+	} else {
+		New-Todo $TodoText
+	}
+}
+
+function find($Pattern, $Path = ".", [switch]$CaseSensitive) {
+	ls -Recurse $Path | Select-String $Pattern -CaseSensitive:$CaseSensitive
+}
 
 function rss($DaysSince = 14) {
 	if (-not (Test-Path $RSS_FEED_FILE)) {
@@ -35,19 +45,79 @@ function rss($DaysSince = 14) {
 	Read-RSSFeedFile $RSS_FEED_FILE | Invoke-RSS -Since $Since -NoAutoSelect
 }
 
+function rss-list($DaysSince = 14) {
+	if (-not (Test-Path $RSS_FEED_FILE)) {
+		throw "The RSS feed file does not exist: '$RSS_FEED_FILE'"
+	}
+	$CurrentDate = Get-Date
+	Read-RSSFeedFile $RSS_FEED_FILE
+		| Get-RSSFeed -Since $CurrentDate.AddDays(-$DaysSince)
+		| sort -Property Published
+		| % {[pscustomobject]@{
+			Age = Format-Age $_.Published $CurrentDate
+			Author = $_.Author
+			Title = $_.Title
+		}}
+}
+
 function rss-edit {
 	npp $RSS_FEED_FILE
 }
 
 function Get-LatestEmail($HowMany, $ConfigFile) {
-	$Client = Connect-EmailServer -FilePath $ConfigFile
-	$Emails = $Client.Inbox.Fetch([math]::Max($Client.Inbox.Count - $HowMany, 0), -1, [MailKit.MessageSummaryItems]::Envelope)
+	$Server = Connect-EmailServer -FilePath $ConfigFile
+	$Folder = $Server.Emails
 	$CurrentDate = Get-Date
-	echo $Emails | % Envelope | % {[pscustomobject]@{
-		Age = Format-Age $_.Date.DateTime $CurrentDate
-		Sender = $_.From.Name ?? $_.From.Address
-		Subject = $_.Subject
-	}}
+	$Folder.Fetch([math]::Max($Folder.Count - $HowMany, 0), -1, [MailKit.MessageSummaryItems]::Envelope)
+		| % Envelope
+		| % {[pscustomobject]@{
+			Age = Format-Age $_.Date.DateTime $CurrentDate
+			Sender = $_.From.Name ?? $_.From.Address
+			Subject = $_.Subject
+		}}
+}
+
+
+
+<# Open current directory in Altap Salamander. #>
+function so([ValidateSet("Left", "Right", "Active", "L", "R", "A")]$Pane = "Right") {
+	& "C:\Program Files\Altap Salamander\salamand.exe" $(switch -Wildcard ($Pane) {
+		L* {"-O", "-P", 1, "-L", (pwd)}
+		R* {"-O", "-P", 2, "-R", (pwd)}
+		A* {"-O", "-A", (pwd)}
+	})
+}
+<# Set current directory to the dir open in Altap Salamander. #>
+function s {
+	Get-AltapSalamanderDirectory | select -First 1 | % FullName | Push-Location
+}
+
+class _CommandName : System.Management.Automation.IValidateSetValuesGenerator {
+    [String[]] GetValidValues() {
+        return Get-Command | % Name
+    }
+}
+
+function edit {
+	param(
+			[Parameter(Mandatory)]
+			[ValidateSet([_CommandName])]
+			[string]
+		$CommandName
+	)
+
+	$Cmd = Get-Command $CommandName
+	if ($Cmd.CommandType -eq "Alias") {
+		$Cmd = $Cmd.ResolvedCommand
+	}
+	$Path = $Cmd.Module.Path
+
+	if ($Cmd.Module.Path) {
+		# this should open the file in editor, not execute it
+		& $Path
+	} else {
+		throw "Could not find path of the module containing the command '$CommandName'."
+	}
 }
 
 function Resolve-VirtualPath {
@@ -139,22 +209,21 @@ function Get-Wifi {
 	}
 }
 
-function Push-ExplorerLocation {
-	$Dirs = Get-ExplorerDirectories
-	$Selected = Read-HostListChoice $Dirs -Prompt "Select directory to cd to:" `
-			-NoInputMessage "No explorer windows found."
-	Push-Location $Selected
-}
+function Push-ExternalLocation {
+	$Dirs = @()
+	$Dirs += Get-ExplorerDirectory
+	$Dirs += Get-AltapSalamanderDirectory
 
-function Push-ClipboardLocation {
-	$clip = Get-Clipboard
-	if (Test-Path -Type Container $clip) {
-		Push-Location $clip
-	} elseif (Test-Path -Type Leaf $clip) {
-		Push-Location (Split-Path $clip)
-	} else {
-		throw "Not a valid path"
+	$Clip = Get-Clipboard | select -First 1 # only get first line of clipboard
+	if (Test-Path -Type Container $Clip) {
+		$Dirs += Get-Item $Clip
+	} elseif (Test-Path -Type Leaf $Clip) {
+		$Dirs += Get-Item (Split-Path $Clip)
 	}
+
+	$Selected = Read-HostListChoice $Dirs -Prompt "Select directory to cd to:" `
+			-NoInputMessage "No Explorer, Altap Salamander or clipboard locations found."
+	Push-Location $Selected
 }
 
 function Test-SshConnection {

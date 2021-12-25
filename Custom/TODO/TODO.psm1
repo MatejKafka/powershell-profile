@@ -19,7 +19,7 @@ function Initialize-Todo {
 			[string]
 		$TodoFilePath
 	)
-	
+
 	if (-not (Test-Path $TodoFilePath)) {
 		New-Item $TodoFilePath
 	}
@@ -33,11 +33,11 @@ function New-Todo {
 			[string]
 		$TodoText
 	)
-	
+
 	CheckInit
 	$null = $script:TODOS.add($TodoText)
 	FlushTodo
-	
+
 	return "Added TODO (current count: $($script:TODOS.Count))."
 }
 
@@ -62,7 +62,7 @@ function Format-Todo {
 		# to get whole pipeline input as array
 		$Todos = @($input)
 	}
-	
+
 	if ($Todos -eq $null) {
 		$Todos = Get-Todo
 	}
@@ -73,7 +73,7 @@ function Format-Todo {
 		$TodoRows = $Todos | % {"($($_.Index)) " + $_.Todo}
 		Write-Host "TODO:" -ForegroundColor $Color
 		$TodoRows | % {Write-Host $_ -ForegroundColor $Color}
-	}	
+	}
 }
 
 function Remove-Todo {
@@ -82,7 +82,7 @@ function Remove-Todo {
 			[int]
 		$TodoIndex
 	)
-	
+
 	CheckInit
 	$Todo = $script:TODOS[$TodoIndex]
 	$null = $script:TODOS.removerange($TodoIndex, 1)
