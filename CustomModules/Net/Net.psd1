@@ -8,5 +8,6 @@
 		"Copy-SshId"
 		"Get-IpAddress"
 	)
+	CmdletsToExport = @()
 	AliasesToExport = @("ip")
 }
