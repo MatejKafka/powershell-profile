@@ -90,8 +90,12 @@ function Invoke-RSSItem {
 	)
 
 	process {
-		# this opens the URL in a browser
-		Start-Process $Item.Uri
+		if (Get-Command Open-Url -ErrorAction Ignore) {
+			Open-Url $Item.Uri
+		} else {
+			# this opens the URL in a browser
+			Start-Process $Item.Uri
+		}
 	}
 }
 
@@ -160,7 +164,13 @@ function Show-RSSItem {
 function Edit-RSSDefaultFeedFile {
 	[Alias("rss-edit")]
 	param()
-	# this should open the text file in a text editor
-	Start-Process (Get-PSDataPath "RSS-Feeds.txt")
+
+	$Path = Get-PSDataPath "RSS-Feeds.txt"
+	if (Get-Command Open-TextFile -ErrorAction Ignore) {
+		Open-TextFile $Path
+	} else {
+		# this should open the text file in a text editor
+		Start-Process $Path
+	}
 }
 
