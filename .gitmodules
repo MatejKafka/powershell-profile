@@ -2,3 +2,6 @@
 	path = CustomModules/ArgumentCompleters
 	url = git@github.com:MatejKafka/PowerShell-ArgumentCompleters.git
 
+[submodule "CustomModules/ZLocation"]
+	path = ZLocation
+	url = git@github.com:MatejKafka/ZLocation.git

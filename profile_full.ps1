@@ -55,8 +55,8 @@ if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	# setup prompt
 	Import-Module $PSScriptRoot\FSNav
 	. $PSScriptRoot\prompt.ps1 $_Times
-	# setup ZLocation
-	Import-Module ZLocation
+	# setup ZLocation (my fork with some change)
+	Import-Module $PSScriptRoot\ZLocation\ZLocation
 }
 
 Remove-Variable _Times
