@@ -1,5 +1,6 @@
-#Requires -Modules Wait-FileChange, TimeFormat, ScratchFile, Oris, Recycle, Invoke-Notepad, TODO
 Set-StrictMode -Version Latest
+
+Import-Module Net
 
 
 $RSS_FEED_FILE = "$PSScriptRoot/../data/rssFeeds.txt"
@@ -17,6 +18,10 @@ New-Alias python python3.exe
 Remove-Alias rm
 New-Alias rm Remove-ItemSafely
 New-Alias rmp Remove-Item
+New-Alias grep Select-String
+
+Remove-Alias diff -Force
+New-Alias diff delta.exe
 
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
@@ -25,7 +30,20 @@ New-Alias venv Activate-Venv
 New-Alias npp Invoke-Notepad
 New-Alias e Push-ExternalLocation
 
-function todo([string]$TodoText) {
+function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
+	# 2019
+	#& 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
+	# 2022, doesn't work from my pwsh config, uses an undefined variable
+	#& 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1'
+	
+	# replacement manual script
+	$VsWherePath = Join-Path ${env:ProgramFiles(x86)} "\Microsoft Visual Studio\Installer\vswhere.exe"
+	$VsPath = & $VsWherePath -Property InstallationPath
+	Import-Module (Join-Path $VsPath "\Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
+	Enter-VsDevShell -Arch $Arch -VsInstallPath $VsPath
+}
+
+function todo ([string]$TodoText) {
 	if ([string]::IsNullOrEmpty($TodoText)) {
 		Get-Todo | Format-Todo -Color "#909060"
 	} else {
@@ -37,12 +55,15 @@ function find($Pattern, $Path = ".", [switch]$CaseSensitive) {
 	ls -Recurse $Path | Select-String $Pattern -CaseSensitive:$CaseSensitive
 }
 
-function rss($DaysSince = 14) {
+function rss {
+	[CmdletBinding()]
+	param($DaysSince = 14)
+
 	if (-not (Test-Path $RSS_FEED_FILE)) {
 		throw "The RSS feed file does not exist: '$RSS_FEED_FILE'"
 	}
 	$Since = [DateTime]::Today.AddDays(-$DaysSince)
-	Read-RSSFeedFile $RSS_FEED_FILE | Invoke-RSS -Since $Since -NoAutoSelect
+	Read-RSSFeedFile $RSS_FEED_FILE | Invoke-RSS -Since $Since -NoAutoSelect -Verbose:$VerbosePreference
 }
 
 function rss-list($DaysSince = 14) {
@@ -61,7 +82,7 @@ function rss-list($DaysSince = 14) {
 }
 
 function rss-edit {
-	npp $RSS_FEED_FILE
+	vim $RSS_FEED_FILE
 }
 
 function Get-LatestEmail($HowMany, $ConfigFile) {
@@ -94,7 +115,7 @@ function s {
 
 class _CommandName : System.Management.Automation.IValidateSetValuesGenerator {
     [String[]] GetValidValues() {
-        return Get-Command | % Name
+        return Get-Command -Type Alias, Cmdlet, ExternalScript, "Function" | % Name
     }
 }
 
@@ -106,13 +127,14 @@ function edit {
 		$CommandName
 	)
 
-	$Cmd = Get-Command $CommandName
-	if ($Cmd.CommandType -eq "Alias") {
-		$Cmd = $Cmd.ResolvedCommand
+	$Cmd = Get-Command $CommandName -Type Alias, Cmdlet, ExternalScript, "Function"
+	$Path = switch ($Cmd.CommandType) {
+		Alias {$Cmd.ResolvedCommand.Module.Path}
+		ExternalScript {$Cmd.Source}
+		default {$Cmd.Module.Path}
 	}
-	$Path = $Cmd.Module.Path
 
-	if ($Cmd.Module.Path) {
+	if ($Path) {
 		# this should open the file in editor, not execute it
 		& $Path
 	} else {
@@ -123,32 +145,6 @@ function edit {
 function Resolve-VirtualPath {
 	param([Parameter(Mandatory)]$Path)
 	return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-}
-
-function code {
-	param(
-			[Parameter(ValueFromPipeline)]
-			[string]
-		$File,
-			[switch]
-		$Wait
-	)
-	if (-not (Get-Process Code -ErrorAction Ignore)) {
-		Start-Process 'D:\_\VS Code\Visual Studio Code (VS Code).lnk'
-		do {sleep 0.05}
-		until (Get-Process Code -ErrorAction Ignore)
-	}
-	$ArgList = $Wait ? @("--wait") : @()
-	$ArgList += Resolve-VirtualPath $File
-	$null = & (gcm Code -CommandType Application) @ArgList 2>&1
-}
-
-function cal {
-	Set-Notebook CALENDAR
-}
-
-function history-npp {
-	npp (Get-PSReadLineOption).HistorySavePath
 }
 
 function make {
@@ -183,7 +179,7 @@ function lnk {
 
 class _WifiNames : System.Management.Automation.IValidateSetValuesGenerator {
 	[String[]] GetValidValues() {
-		return ((netsh.exe wlan show profile) -match '\s{2,}:\s') -replace '.*:\s' , ''
+		return Get-WiFiProfile | % ProfileName
 	}
 }
 
@@ -193,20 +189,7 @@ function Get-Wifi {
 			[string]
 		$Name
 	)
-
-	if ([string]::IsNullOrEmpty($Name)) {
-		return [_WifiNames]::new().GetValidValues() | % {
-			Get-Wifi $_
-		}
-	}
-
-	$Out = netsh.exe wlan show profile $Name key=clear
-	$PasswordLine = $Out -match ".*    Key Content.*"
-	return [PSCustomObject]@{
-		Name = $Name
-		Authentication = ($Out -match '.*    Authentication.*')[0] -replace '.*:\s', ''
-		Password = if ($PasswordLine) {$PasswordLine[0] -replace '.*:\s', ''} else {$null}
-	}
+	return Get-WifiProfile -ClearKey $Name
 }
 
 function Push-ExternalLocation {
@@ -226,144 +209,10 @@ function Push-ExternalLocation {
 	Push-Location $Selected
 }
 
-function Test-SshConnection {
-	param(
-			[Parameter(Mandatory)]
-			[string]
-		$Login,
-			[ValidateScript({Test-Path $_})]
-			[string]
-		$KeyFilePath
-	)
-
-	$OrigLEC = $LastExitCode
-	$Arg = if ([string]::IsNullOrEmpty($KeyFilePath)) {@()} else {@("-i", $KeyFilePath)}
-	try {
-		$null = $(ssh $Login -o PasswordAuthentication=no @Arg exit) 2>&1
-		return $LastExitCode -eq 0
-	} catch {
-		return $False
-	} finally {
-		$LastExitCode = $OrigLEC
-	}
-}
-
-function Copy-SshId {
-	param(
-			[Parameter(Mandatory)]
-			[string]
-		$Login,
-			[Parameter(Mandatory)]
-			[ValidateScript({Test-Path $_})]
-			[string]
-		$KeyFilePath
-	)
-
-	$PubKeyPath = if ([IO.Path]::GetExtension($KeyFilePath) -eq "") {
-		$KeyFilePath + ".pub"
-	} else {
-		$KeyFilePath
-	}
-
-	$KeyFilePath = Resolve-Path $KeyFilePath
-
-	Write-Verbose "Testing if key is already installed..."
-	if (Test-SSHConnection $Login $KeyFilePath) {
-		return "Key already installed."
-	}
-
-	Write-Verbose "Installing key..."
-	Get-Content $PubKeyPath | ssh $Login "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
-	if ($LastExitCode -gt 0) {
-		throw "Could not install public key for '$Login'."
-	}
-	Write-Verbose "Public key successfully installed for '$Login', trying to log in..."
-	if (Test-SSHConnection $Login $KeyFilePath) {
-		return "Key successfully installed."
-	}
-	throw "Key installation failed."
-}
-
 function ssh-config {
-	npp $env:HOME\.ssh\config
+	vim $env:HOME\.ssh\config
 }
 
-function Out-Tcp {
-	param(
-			[Parameter(Mandatory)]
-			[string]
-		$Host,
-			[Parameter(Mandatory)]
-			[int]
-		$Port,
-			[Parameter(Mandatory, ValueFromPipeline)]
-			[string]
-		$Message
-	)
-
-	begin {
-		$sock = New-Object System.Net.Sockets.TcpClient
-		$enc = New-Object System.Text.UTF8Encoding
-		$sock.Connect($Host, $Port)
-		$stream = $sock.GetStream()
-	}
-	process {
-		$bytes = $enc.GetBytes($Message)
-		[void]$stream.Write($bytes, 0, $bytes.Length)
-	}
-	end {$sock.Close()}
-}
-
-function Out-Udp {
-	param(
-			[Parameter(Mandatory)]
-			[string]
-		$Host,
-			[Parameter(Mandatory)]
-			[int]
-		$Port,
-			[Parameter(Mandatory, ValueFromPipeline)]
-			[string]
-		$Message,
-			<# Wait for a reply after each sent packet. Only use on reliable networks,
-			   as this blocks forever in case the reply packet is lost. #>
-			[switch]
-		$WaitForReply,
-			<# Add a newline (\n) to each outgoing packet, and strip a single trailing newline from incoming packets, if present. #>
-			[switch]
-		$Newlines
-	)
-
-	begin {
-		$sock = New-Object System.Net.Sockets.UdpClient
-		$enc = New-Object System.Text.UTF8Encoding
-		$sock.Connect($Host, $Port)
-		# dummy for receiving, not used anywhere
-		$remoteHost = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
-	}
-	process {
-		if ($Newlines) {$Message = $Message + "`n"}
-		$bytes = $enc.GetBytes($Message)
-		[void]$sock.Send($bytes, $bytes.Length)
-		if ($WaitForReply) {
-			# TODO: handle decoding error
-			$replyStr = $enc.GetString($sock.Receive([ref]$remoteHost))
-			if ($Newlines) {
-				echo ($replyStr -replace "`n$") # remove trailing newline, if any
-			} else {
-				echo $replyStr
-			}
-		}
-	}
-	end {$sock.Close()}
-}
-
-function ip {
-	Get-NetIPAddress
-		| ? {$_.AddressFamily -eq "IPv4" -and $_.SuffixOrigin -in @("Dhcp", "Manual") `
-			-and !$_.InterfaceAlias.StartsWith("vEthernet")}
-		| select InterfaceAlias, IPAddress
-}
 
 function oris {
 	Get-OrisEnrolledEvents | Format-OrisEnrolledEvents
@@ -374,7 +223,7 @@ function BulkRename() {
 	if ($null -eq $Items) {throw "No items to rename"}
 	$TempFile = New-TemporaryFile
 	$Items | select -ExpandProperty Name | Out-File $TempFile
-	npp $TempFile
+	vim $TempFile
 	[array]$NewNames = cat $TempFile
 	rm $TempFile
 	if ($Items.Count -ne $NewNames.Count) {
@@ -393,28 +242,23 @@ function BulkRename() {
 
 function Activate-Venv([string]$VenvName) {
 	if ("" -eq $VenvName) {
-		$path = ".\venv\Scripts\Activate.ps1"
+		$Paths = ".\venv\Scripts\Activate.ps1", ".\.venv\Scripts\Activate.ps1"
 	} else {
-		$path = ".\$VenvName\Scripts\Activate.ps1"
+		$Paths = ".\$VenvName\Scripts\Activate.ps1"
 	}
 
-	$dir = Get-Location
-	while (-not (Test-Path (Join-Path $dir $path))) {
-		$dir = Split-Path $dir
-		if ($dir -eq "") {
+	$Dir = Get-Location
+	while ($True) {
+		$Path = $Paths | % {Join-Path $Dir $_} | ? {Test-Path $_} | select -First 1
+		if ($Path) {break}
+
+		$Dir = Split-Path $Dir
+		if ($Dir -eq "") {
 			throw "No venv found."
 		}
 	}
-	& (Join-Path $dir $path)
-	echo "Activated venv in '$dir'."
-}
-
-
-function Get-ProcessHistory($Last = 10) {
-	Get-WinEvent Security |
-		where id -eq 4688 |
-		select -First $Last |
-		select TimeCreated, @{Label = "Command"; Expression = {$_.Properties[8].Value}}
+	& $Path
+	echo "Activated venv in '$Dir'."
 }
 
 
@@ -437,17 +281,6 @@ function Update-EnvVar {
 }
 
 
-#function Pause {
-#	Write-Host -NoNewLine 'Press any key to continue...'
-#	$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-#}
-
-
-# function sudo {
-#	Start-Process -Verb RunAs -FilePath "pwsh" -ArgumentList (@("-NoExit", "-Command") + $args)
-# }
-
-
 function Update-PowerShell([switch]$Stable) {
 	$InstallerScript = Invoke-RestMethod https://aka.ms/install-powershell.ps1
 	$Installer = [ScriptBlock]::Create($InstallerScript)
@@ -456,7 +289,6 @@ function Update-PowerShell([switch]$Stable) {
 	} else {
 		& $Installer -UseMSI -Preview
 	}
-	#Invoke-Expression "& { $(Invoke-RestMethod https://aka.ms/install-powershell.ps1) } -UseMSI -Preview"
 }
 
 

@@ -1,25 +1,10 @@
-#Requires -Modules TimeFormat, Write-HostLineEnd, Pansies, posh-git
 param(
 		[Parameter(Mandatory)]
 		[HashTable]
 	$Times
 )
 
-
-Set-PSReadLineKeyHandler -Key Shift+UpArrow -Function HistorySearchBackward
-Set-PSReadLineKeyHandler -Key Shift+DownArrow -Function HistorySearchForward
-Set-PSReadLineOption -HistorySearchCursorMovesToEnd
-
-# enable fish-like autocompletion
-Set-PSReadLineOption -PredictionSource History
-
-# autocomplete should offer all options, not fill in the first one
-Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
-# set which part of prompt is highlighted in red for invalid input
-Set-PSReadLineOption -PromptText "> "
-# inform PSReadLine that our prompt has 2 lines
-Set-PSReadLineOption -ExtraPromptLineCount 1
-
+. $PSScriptRoot\PSReadLineOptions.ps1
 
 # written by our overriden version of Out-Default
 $script:_LastCmdOutputTypes = @()
@@ -31,6 +16,18 @@ $Env:VIRTUAL_ENV_DISABLE_PROMPT = $true
 $script:FirstPromptTime = $null
 
 
+$PromptColors = @{
+	Error = @{
+		Color = [PoshCode.Pansies.RgbColor]"#906060"
+		CwdColor = [PoshCode.Pansies.RgbColor]"#C99999"
+	}
+	Ok = @{
+		Color = [PoshCode.Pansies.RgbColor]"#666696"
+		CwdColor = [PoshCode.Pansies.RgbColor]"#9999C9"
+	}
+}
+
+
 Function Get-LastCommandStatus {
 	param(
 			[Parameter(Mandatory)]
@@ -38,18 +35,22 @@ Function Get-LastCommandStatus {
 		$ErrorOccurred,
 			[Parameter(Mandatory)]
 			[int]
-		$LastExitCode
+		$LastExitCode,
+			[Parameter(Mandatory)]
+			[AllowEmptyCollection()]
+			[System.Type[]]
+		$LastCmdOutputTypes
 	)
 
 	# status string indicating outcome of previous command
 	$StatusStr = ""
 
 	# render output type of previous command, unless it resulted in an error
-	if ($script:_LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
-		if ($script:_LastCmdOutputTypes.Length -gt 1) {
-			$StatusStr += "[" + $script:_LastCmdOutputTypes.Length + "]"
+	if ($LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+		if ($LastCmdOutputTypes.Length -gt 1) {
+			$StatusStr += "[" + $LastCmdOutputTypes.Length + "]"
 		}
-		$StatusStr += $script:_LastCmdOutputTypes[0].ToString() + " | "
+		$StatusStr += $LastCmdOutputTypes[0].ToString() + " | "
 	}
 
 	# print exit code if error occurred
@@ -96,17 +97,48 @@ Function Get-LastCommandStatus {
 }
 
 
+Function Write-ShellStatus($InfoColor) {
+	function Write-InfoStatus($Status) {
+		Write-Host "($Status)" -NoNewLine -ForegroundColor $InfoColor
+	}
+
+	# show if we're inside a MSVC Developer shell
+	if ($null -ne $env:VSINSTALLDIR) {
+		Write-InfoStatus "msvc"
+	}
+
+	# show if we're running with active python venv
+	if ($null -ne $env:VIRTUAL_ENV) {
+		$VenvName = Split-Path -Leaf $env:VIRTUAL_ENV
+		Write-InfoStatus $VenvName
+	}
+
+	if (Test-Path -Type Container .) {
+		# show if we're inside a git repository
+		$GitDir = Get-GitDirectory
+		if ($GitDir) {
+			$GitStr = try {
+				$RefStr = cat (Join-Path $GitDir "./HEAD")
+				# "ref: refs/heads/".Length
+				$BranchName = $RefStr.Substring(16)
+				"git:" + $BranchName
+			} catch {"git"}
+			Write-InfoStatus $GitStr
+		}
+	} else {
+		Write-Host "(X)" -NoNewLine -ForegroundColor "Red"
+	}
+}
+
+
 $script:LastCmdId = $null
 
 Function global:Prompt {
 	$ErrorOccurred = -not ($? -and ($global:LastExitCode -eq 0))
-	if ($ErrorOccurred) {
-		$Color = [PoshCode.Pansies.RgbColor]"#906060"
-		$CwdColor = [PoshCode.Pansies.RgbColor]"#C99999"
-	} else {
-		$Color = [PoshCode.Pansies.RgbColor]"#666696"
-		$CwdColor = [PoshCode.Pansies.RgbColor]"#9999C9"
-	}
+
+	$Colors = $ErrorOccurred ? $PromptColors.Error : $PromptColors.Ok
+	$Color = $Colors.Color
+	$CwdColor = $Colors.CwdColor
 
 	if ($Host.UI.RawUI.CursorPosition.Y -eq 0) {
 		# screen was cleared, create offset for our prompt
@@ -120,7 +152,7 @@ Function global:Prompt {
 			$script:LastCmdId = $LastCmd.Id
 		}
 		# render previous command status
-		Get-LastCommandStatus $ErrorOccurred $global:LastExitCode
+		Get-LastCommandStatus $ErrorOccurred $global:LastExitCode $script:_LastCmdOutputTypes
 	} else {
 		"" # should be empty, as sometimes we rerender prompt in same place, which should keep previous time
 	}
@@ -129,36 +161,35 @@ Function global:Prompt {
 
 	# write horizontal separator
 	Write-Host ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
-	Write-Host  "╚╣ " -NoNewLine -ForegroundColor $Color
+	Write-Host  "╚╣" -NoNewLine -ForegroundColor $Color
+	Write-ShellStatus $Color
+	Write-Host -NoNewLine " "
 
-	if (Test-Path -Type Container .) {
-		# show if we're running with active python venv
-		if ($null -ne $env:VIRTUAL_ENV) {
-			Write-Host "(venv) " -NoNewLine -ForegroundColor $Color
-		}
+	$CwdString = [string](Get-Location)
+	
+	# write the prompt itself
+	Write-Host $CwdString -NoNewLine -ForegroundColor $CwdColor
 
-		# show if we're inside a git repository
-		$GitDir = Get-GitDirectory
-		if ($GitDir) {
-			$GitStr = try {
-				$RefStr = cat (Join-Path $GitDir "./HEAD")
-				# "ref: refs/heads/".Length
-				$BranchName = $RefStr.Substring(16)
-				"(git:" + $BranchName + ")"
-			} catch {"(git)"}
-			Write-Host ($GitStr + " ") -NoNewLine -ForegroundColor $Color
-		}
+	# set indent of continuation prompt to match the main prompt (so that multiline code in the prompt has no jumps between lines)
+	Set-PSReadLineOption -ContinuationPrompt (" " * [math]::max(0, $Host.UI.RawUI.CursorPosition.X - 1) + ">> ")
+
+
+	# set tab/window title to the shortened version of CWD (my Windows Terminal tab title fits roughly 25 chars (it's non-monospace))
+	$Host.UI.RawUI.WindowTitle = if ($CwdString.Length -le 25) {
+		$CwdString
 	} else {
-		Write-Host "(X) " -NoNewLine -ForegroundColor "Red"
+		$Trimmed = $CwdString.Substring($CwdString.Length - 25)
+		$SlashI = $Trimmed.IndexOfAny("\/")
+		"…" + $(if ($SlashI -ge 0) {$Trimmed.Substring($SlashI)} else {$Trimmed})
 	}
 
-	# write prompt itself
-	Write-Host ([string](Get-Location)) -NoNewLine -ForegroundColor $CwdColor
-
+	
 	# reset exit code
 	$global:LastExitCode = 0
-	# reset last output types
+	# reset last output types and move them to the user-accessible $global:Types variable
+	$global:Types = $script:_LastCmdOutputTypes
 	$script:_LastCmdOutputTypes = @()
+
 	return "> "
 }
 

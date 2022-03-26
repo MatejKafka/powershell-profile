@@ -14,11 +14,10 @@ $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
 
-# to support symlinked profile path
-$CONFIG_DIR = Get-Item $PSCommandPath | % {if ($null -ne $_.Target) {$_.Target} else {$_}} | Split-Path
-$DATA_DIR = Resolve-Path $CONFIG_DIR\..\data
+$DATA_DIR = Resolve-Path $PSScriptRoot\..\data
+
 # add custom module directory
-$env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path $CONFIG_DIR"\Custom")
+$env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path "$PSScriptRoot\CustomModules")
 # set path where command history is saved
 Set-PSReadLineOption -HistorySavePath (Join-Path $DATA_DIR "ConsoleHost_history.txt")
 # set database path for ZLocation
@@ -32,13 +31,13 @@ $_Times.setup = Get-Date
 # RGB colors for Write-Host
 Import-Module Pansies
 # custom functions
-Import-Module $CONFIG_DIR\functions.psm1 -DisableNameChecking
+Import-Module $PSScriptRoot\functions.psm1 -DisableNameChecking
 # custom private functions, not commited to git
-if (Test-Path $CONFIG_DIR\functions_custom.psm1) {
-	Import-Module $CONFIG_DIR\functions_custom.psm1 -DisableNameChecking
+if (Test-Path $PSScriptRoot\functions_custom.psm1) {
+	Import-Module $PSScriptRoot\functions_custom.psm1 -DisableNameChecking
 }
 # native command arg completers
-. $CONFIG_DIR\arg_completer.ps1
+Import-Module ArgumentCompleters
 
 # reload path from system env
 Update-EnvVar Path
@@ -50,12 +49,14 @@ $_Times.imports = Get-Date
 if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	# do not show custom banner (TODO, version, calendar,...) if set
 	if (-not (Test-Path Env:PS_NO_BANNER)) {
-		& $CONFIG_DIR\banner.ps1
+		& $PSScriptRoot\banner.ps1
 		$_Times.banner = Get-Date
 	}
 	# setup prompt
-	Import-Module $CONFIG_DIR\FSNav
-	. $CONFIG_DIR\prompt.ps1 $_Times
+	Import-Module $PSScriptRoot\FSNav
+	. $PSScriptRoot\prompt.ps1 $_Times
 	# setup ZLocation
 	Import-Module ZLocation
 }
+
+Remove-Variable _Times
