@@ -22,7 +22,7 @@ $env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path "$PSScriptRoot\Cus
 # set path where command history is saved
 Set-PSReadLineOption -HistorySavePath (Get-PSDataPath "ConsoleHost_history.txt")
 # set database path for ZLocation
-$env:PS_ZLOCATION_DATABASE_PATH = Get-PSDataPath "z-location.db"
+$env:PS_ZLOCATION_DATABASE_PATH = Get-PSDataPath "z-location.db" -NoCreate
 
 # set env:LANG, which makes `git diff` and other originally Linux commands print stuff with correct encoding
 $env:LANG = "C.UTF-8"
