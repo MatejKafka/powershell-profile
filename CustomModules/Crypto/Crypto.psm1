@@ -60,6 +60,21 @@ function _ChunkString($Str, $ChunkLength) {
 	}
 }
 
+function Get-Factors {
+	param(
+			[Parameter(Mandatory)]
+			[Int64]
+		$N
+	)
+
+	# inefficient, but simple
+	for ($i = 2; $i -lt $N; $i++) {
+		if ($N % $i -eq 0) {
+			echo $i
+		}
+	}
+}
+
 function Invoke-TranspositionColumnDecryption {
 	param(
 			[Parameter(Mandatory)]
@@ -71,14 +86,7 @@ function Invoke-TranspositionColumnDecryption {
 	Write-Host ""
 	Write-Host "Ciphertext length: $($Ciphertext.Length)"
 
-	$Factors = @()
-	for ($i = 2; $i -lt $Ciphertext.Length; $i++) {
-		if ($Ciphertext.Length % $i -eq 0) {
-			$Factors += $i
-		}
-	}
-
-	$Factors | % {
+	Get-Factors $Ciphertext.Length | % {
 		Write-Host ""
 		Write-Host "$_ * $($Ciphertext.Length / $_):"
 		$Out = @("") * $_

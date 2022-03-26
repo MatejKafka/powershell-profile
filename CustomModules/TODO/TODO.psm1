@@ -1,6 +1,19 @@
 $script:TODO_PATH = $null
 $script:TODOS = $null
 
+class Todo {
+	[int]$Index
+	[string]$Todo
+
+	Todo([int]$Index, [string]$Todo) {
+		$this.Index = $Index
+		$this.Todo = $Todo
+	}
+
+	[string] ToString() {
+		return "($($this.Index)) $($this.Todo)"
+	}
+}
 
 function CheckInit {
 	if ($null -eq $script:TODO_PATH) {
@@ -44,10 +57,7 @@ function New-Todo {
 function Get-Todo {
 	CheckInit
 	for ($i = 0; $i -lt $script:TODOS.Count; $i++) {
-		[PSCustomObject]@{
-			Index = $i
-			Todo = $script:Todos[$i]
-		}
+		[Todo]::new($i, $script:Todos[$i])
 	}
 }
 
@@ -60,7 +70,7 @@ function Format-Todo {
 
 	if ($MyInvocation.ExpectingInput) {
 		# to get whole pipeline input as array
-		$Todos = @($input)
+		$Todos = @($Input)
 	}
 
 	if ($Todos -eq $null) {
@@ -85,8 +95,8 @@ function Remove-Todo {
 
 	CheckInit
 	$Todo = $script:TODOS[$TodoIndex]
-	$null = $script:TODOS.removerange($TodoIndex, 1)
+	$null = $script:TODOS.RemoveAt($TodoIndex)
 	FlushTodo
 	echo $Todo
-	return "Removed TODO #${TodoIndex}, $($script:TODOS.Count) remaining."
+	echo "Removed TODO #${TodoIndex}, $($script:TODOS.Count) remaining."
 }

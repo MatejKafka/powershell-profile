@@ -30,6 +30,9 @@ Function Invoke-Notepad {
 		#$nppProc | Wait-Process
 		$null = Wait-FileChange $File {$nppProc.HasExited}
 	} finally {
+		# short sleep to finish longer writes to the file
+		# FIXME: hacky
+		sleep 0.1
 		Stop-Process $nppProc
 	}
 }

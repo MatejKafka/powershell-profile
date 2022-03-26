@@ -49,7 +49,7 @@ function Connect-EmailServer {
 	$Server.Reconnect()
 	$Server.Client.Authenticate($Credentials)
 
-	# returning the folder from if and assigning it outside causes collection enumeration,
+	# returning the folder from `if` and assigning it outside causes collection enumeration,
 	#  which fails, because the folder is not open yet
 	if ([string]::IsNullOrEmpty($Folder)) {
 		$Server.Emails = $null
