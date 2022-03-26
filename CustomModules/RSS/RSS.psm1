@@ -133,10 +133,10 @@ function Invoke-RSS {
 
 function Read-RSSFeedFile {
 	param(
-			[Parameter(Mandatory, ValueFromPipeline)]
+			[Parameter(ValueFromPipeline)]
 			[string]
 			[ValidateScript({Test-Path -Type Leaf $_})]
-		$FilePath
+		$FilePath = (Get-PSDataPath "RSS-Feeds.txt")
 	)
 
 	return Get-Content $FilePath | % {
@@ -146,3 +146,21 @@ function Read-RSSFeedFile {
 	}
 
 }
+
+
+function Show-RSSItem {
+	[Alias("rss")]
+	[CmdletBinding()]
+	param($DaysSince = 14)
+
+	$Since = [DateTime]::Today.AddDays(-$DaysSince)
+	Read-RSSFeedFile | Invoke-RSS -Since $Since -NoAutoSelect -Verbose:$VerbosePreference
+}
+
+function Edit-RSSDefaultFeedFile {
+	[Alias("rss-edit")]
+	param()
+	# this should open the text file in a text editor
+	Start-Process (Get-PSDataPath "RSS-Feeds.txt")
+}
+

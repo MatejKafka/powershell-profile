@@ -14,14 +14,15 @@ $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
 
-$DATA_DIR = Resolve-Path $PSScriptRoot\..\data
+Set-PSDataRoot $PSScriptRoot\..\data
+
 
 # add custom module directory
 $env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path "$PSScriptRoot\CustomModules")
 # set path where command history is saved
-Set-PSReadLineOption -HistorySavePath (Join-Path $DATA_DIR "ConsoleHost_history.txt")
+Set-PSReadLineOption -HistorySavePath (Get-PSDataPath "ConsoleHost_history.txt")
 # set database path for ZLocation
-$env:PS_ZLOCATION_DATABASE_PATH = Join-Path $DATA_DIR "z-location.db"
+$env:PS_ZLOCATION_DATABASE_PATH = Get-PSDataPath "z-location.db"
 
 # set env:LANG, which makes `git diff` and other originally Linux commands print stuff with correct encoding
 $env:LANG = "C.UTF-8"

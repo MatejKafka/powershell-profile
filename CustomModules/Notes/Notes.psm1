@@ -1,9 +1,6 @@
-$VirtualPath = $PSScriptRoot + "\notes"
-if (-not (Test-Path $VirtualPath)) {
-	New-Item -Type Diretory $VirtualPath
-}
+Set-StrictMode -Version Latest
 
-$NOTE_DIR_PATH = Resolve-Path $VirtualPath
+$NOTE_DIR_PATH = Get-PSDataPath "Notes" -Directory
 
 
 class NoteFile : System.Management.Automation.IValidateSetValuesGenerator {

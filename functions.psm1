@@ -1,13 +1,5 @@
 Set-StrictMode -Version Latest
 
-Import-Module Net
-
-
-$RSS_FEED_FILE = "$PSScriptRoot/../data/rssFeeds.txt"
-$TODO_FILE = "$PSScriptRoot/../data/todos.json"
-
-Initialize-Todo $TODO_FILE
-
 
 New-Alias ipy ipython
 # where is masked by builtin alias for Where-Object
@@ -53,36 +45,6 @@ function todo ([string]$TodoText) {
 
 function find($Pattern, $Path = ".", [switch]$CaseSensitive) {
 	ls -Recurse $Path | Select-String $Pattern -CaseSensitive:$CaseSensitive
-}
-
-function rss {
-	[CmdletBinding()]
-	param($DaysSince = 14)
-
-	if (-not (Test-Path $RSS_FEED_FILE)) {
-		throw "The RSS feed file does not exist: '$RSS_FEED_FILE'"
-	}
-	$Since = [DateTime]::Today.AddDays(-$DaysSince)
-	Read-RSSFeedFile $RSS_FEED_FILE | Invoke-RSS -Since $Since -NoAutoSelect -Verbose:$VerbosePreference
-}
-
-function rss-list($DaysSince = 14) {
-	if (-not (Test-Path $RSS_FEED_FILE)) {
-		throw "The RSS feed file does not exist: '$RSS_FEED_FILE'"
-	}
-	$CurrentDate = Get-Date
-	Read-RSSFeedFile $RSS_FEED_FILE
-		| Get-RSSFeed -Since $CurrentDate.AddDays(-$DaysSince)
-		| sort -Property Published
-		| % {[pscustomobject]@{
-			Age = Format-Age $_.Published $CurrentDate
-			Author = $_.Author
-			Title = $_.Title
-		}}
-}
-
-function rss-edit {
-	vim $RSS_FEED_FILE
 }
 
 function Get-LatestEmail($HowMany, $ConfigFile) {

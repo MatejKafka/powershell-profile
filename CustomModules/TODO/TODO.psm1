@@ -100,3 +100,8 @@ function Remove-Todo {
 	echo $Todo
 	echo "Removed TODO #${TodoIndex}, $($script:TODOS.Count) remaining."
 }
+
+
+try {
+	Initialize-Todo (Get-PSDataPath "TODO.json")
+} catch {}

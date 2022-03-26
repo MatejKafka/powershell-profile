@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 
 $API_URL = "https://oris.orientacnisporty.cz/API/"
-$CONFIG_PATH = Join-Path $PSScriptRoot "./config.txt"
+$CONFIG_PATH = Get-PSDataPath "ORIS.txt" -NoCreate
 
 if (-not (Test-Path $CONFIG_PATH)) {
 	$USER_ID = $null
@@ -68,6 +68,9 @@ function Get-OrisEnrolledEvents {
 		datefrom = (Get-Date).ToString("yyyy-MM-dd")	
 	}
 	
+	if ($null -eq $Result) {
+		return # no enrolled events
+	}
 	$EnrolledEvents = $Result | Get-Member -Type NoteProperty | % {$Result.($_.Name)}
 	$AllEvents = _Get-OrisEvents $EnrolledEvents[0].EventDate $EnrolledEvents[$EnrolledEvents.Count - 1].EventDate
 	
