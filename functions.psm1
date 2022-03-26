@@ -172,7 +172,7 @@ function Push-ExternalLocation {
 }
 
 function ssh-config {
-	vim $env:HOME\.ssh\config
+	Open-TextFile $env:HOME\.ssh\config
 }
 
 
@@ -185,7 +185,7 @@ function BulkRename() {
 	if ($null -eq $Items) {throw "No items to rename"}
 	$TempFile = New-TemporaryFile
 	$Items | select -ExpandProperty Name | Out-File $TempFile
-	vim $TempFile
+	Open-TextFile $TempFile
 	[array]$NewNames = cat $TempFile
 	rm $TempFile
 	if ($Items.Count -ne $NewNames.Count) {
