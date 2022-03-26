@@ -1,0 +1,4 @@
+[submodule "CustomModules/ArgumentCompleters"]
+	path = CustomModules/ArgumentCompleters
+	url = git@github.com:MatejKafka/PowerShell-ArgumentCompleters.git
+
