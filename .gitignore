@@ -1,11 +1,3 @@
-/Modules/*
-/Custom/Copy-ToVM/*
-/Custom/Invoke-WebServer/usb_webserver/apache2/logs/*
-/Custom/Invoke-WebServer/usb_webserver/mysql/data/*
-/Custom/Invoke-WebServer/usb_webserver/apache2/conf/httpd.conf
-/Custom/Invoke-WebServer/usb_webserver/mysql/my.ini
-/Custom/Invoke-WebServer/usb_webserver/php/php.ini
-/links
+/Modules/
 /functions_custom.psm1
 /scripts/
-/config/
