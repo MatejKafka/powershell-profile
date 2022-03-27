@@ -172,7 +172,7 @@ function Push-ExternalLocation {
 }
 
 function ssh-config {
-	Open-TextFile $env:HOME\.ssh\config
+	Open-TextFile $HOME\.ssh\config
 }
 
 
