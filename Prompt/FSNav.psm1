@@ -1,6 +1,7 @@
 # Require -Modules Count
-
 Set-StrictMode -Version Latest
+
+Import-Module $PSScriptRoot\_Colors
 
 # hacked together, needs rewrite
 
@@ -27,6 +28,10 @@ function PadLine {
 $script:MaxListCount = 20
 
 function PrintItemList($baseCursor, $matching, $searchBuffer) {
+	$BaseColor = $UIColors.Prompt.Ok.Base
+	$TextColor = $UIColors.Prompt.Ok.Highlight
+	$ErrorTextColor = $UIColors.Prompt.Error.Highlight
+
 	$rui.CursorPosition = $baseCursor
 	$CurrentHeight = 0
 	$bufferLength = $searchBuffer.Length
@@ -34,18 +39,18 @@ function PrintItemList($baseCursor, $matching, $searchBuffer) {
 	Write-Host ""
 
 	if ($null -eq $matching) {
-		Write-Host -NoNewLine -ForegroundColor "#666696" (" ╚⸨ ")
-		PadLine "NO DIRECTORIES" -ForegroundColor "#C99999"
+		Write-Host -NoNewLine -ForegroundColor $BaseColor (" ╚⸨ ")
+		PadLine "NO DIRECTORIES" -ForegroundColor $ErrorTextColor
 		$CurrentHeight += 1
 	} else {
 		$matching | select -First $script:MaxListCount | % {
-			Write-Host -NoNewLine -ForegroundColor "#666696" (" ╠⸨ ")
-			Write-Host -NoNewLine -ForegroundColor "#9999C9" -BackgroundColor "#404078" $_.Substring(0, $bufferLength)
-			PadLine $_.Substring($bufferLength) -ForegroundColor "#9999C9"
+			Write-Host -NoNewLine -ForegroundColor $BaseColor (" ╠⸨ ")
+			Write-Host -NoNewLine -BackgroundColor $BaseColor $_.Substring(0, $bufferLength)
+			PadLine $_.Substring($bufferLength) -ForegroundColor $TextColor
 			$CurrentHeight += 1
 		}
 		if ((count $matching) -gt $script:MaxListCount) {
-			PadLine -ForegroundColor "#666696" (" ╚⸨ " + "... (+$($matching.Count - $script:MaxListCount))")
+			PadLine -ForegroundColor $BaseColor (" ╚⸨ " + "... (+$($matching.Count - $script:MaxListCount))")
 			return
 		}
 	}
@@ -201,7 +206,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		
 		# Left arrow
 		if ($key.VirtualKeyCode -eq 37) {
-			C:
+			cd C:
 			Refresh
 			continue
 		}

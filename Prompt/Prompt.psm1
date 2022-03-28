@@ -4,7 +4,12 @@ param(
 	$Times
 )
 
-. $PSScriptRoot\PSReadLineOptions.ps1
+Set-StrictMode -Version Latest
+Export-ModuleMember # don't export anything
+
+Import-Module $PSScriptRoot\_Colors
+Import-Module $PSScriptRoot\PSReadLineOptions
+Import-Module $PSScriptRoot\FSNav
 
 # written by our overriden version of Out-Default
 $script:_LastCmdOutputTypes = @()
@@ -12,21 +17,28 @@ $script:_LastCmdOutputTypes = @()
 $global:LastExitCode = 0
 # otherwise python venv would break our fancy Prompt
 $Env:VIRTUAL_ENV_DISABLE_PROMPT = $true
+# this shows a progress bar on taskbar and in terminal tab icon in Windows Terminal
+$PSStyle.Progress.UseOSCIndicator = $true
 
 $script:FirstPromptTime = $null
 
 
-$PromptColors = @{
-	Error = @{
-		Color = [PoshCode.Pansies.RgbColor]"#906060"
-		CwdColor = [PoshCode.Pansies.RgbColor]"#C99999"
-	}
-	Ok = @{
-		Color = [PoshCode.Pansies.RgbColor]"#666696"
-		CwdColor = [PoshCode.Pansies.RgbColor]"#9999C9"
-	}
-}
+Function Write-HostLineEnd($message, $foregroundColor, $dy = 0) {
+	$origCursor = $Host.UI.RawUI.CursorPosition
 
+	if ($message.Length -gt $Host.UI.RawUI.WindowSize.Width) {
+		$message = $message.Substring(0, $Host.UI.RawUI.WindowSize.Width - 4) + " ..."
+	}
+
+	$targetCursor = $Host.UI.RawUI.CursorPosition
+	$targetCursor.X = $Host.UI.RawUI.WindowSize.Width - $message.Length
+	$targetCursor.Y += $dy
+
+	$Host.UI.RawUI.CursorPosition = $targetCursor
+	Write-Host $message -NoNewLine -ForegroundColor $foregroundColor
+
+	$Host.UI.RawUI.CursorPosition = $origCursor
+}
 
 Function Get-LastCommandStatus {
 	param(
@@ -97,6 +109,25 @@ Function Get-LastCommandStatus {
 }
 
 
+# this function is taken from `posh-git` module and simplified a bit to speed up startup
+# loading the whole posh-git module caused quite a long delay, and we only need this one function
+function Get-GitDirectory {
+	$pathInfo = Get-Location
+	if (!$pathInfo -or ($pathInfo.Provider.Name -ne 'FileSystem')) {
+		$null
+	} elseif ($Env:GIT_DIR) {
+		$Env:GIT_DIR -replace '\\|/', [System.IO.Path]::DirectorySeparatorChar
+	} else {
+		$currentDir = Get-Item -LiteralPath $pathInfo -Force
+		for (; $currentDir; $currentDir = $currentDir.Parent) {
+			$gitDirPath = Join-Path $currentDir .git
+			if (Test-Path -LiteralPath $gitDirPath -Type Container) {
+				return $gitDirPath
+			}
+		}
+	}
+}
+
 Function Write-ShellStatus($InfoColor) {
 	function Write-InfoStatus($Status) {
 		Write-Host "($Status)" -NoNewLine -ForegroundColor $InfoColor
@@ -136,9 +167,9 @@ $script:LastCmdId = $null
 Function global:Prompt {
 	$ErrorOccurred = -not ($? -and ($global:LastExitCode -eq 0))
 
-	$Colors = $ErrorOccurred ? $PromptColors.Error : $PromptColors.Ok
-	$Color = $Colors.Color
-	$CwdColor = $Colors.CwdColor
+	$Colors = $ErrorOccurred ? $UIColors.Prompt.Error : $UIColors.Prompt.Ok
+	$Color = $Colors.Base
+	$CwdColor = $Colors.Highlight
 
 	if ($Host.UI.RawUI.CursorPosition.Y -eq 0) {
 		# screen was cleared, create offset for our prompt
@@ -161,7 +192,7 @@ Function global:Prompt {
 
 	# write horizontal separator
 	Write-Host ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
-	Write-Host  "╚╣" -NoNewLine -ForegroundColor $Color
+	Write-Host	"╚╣" -NoNewLine -ForegroundColor $Color
 	Write-ShellStatus $Color
 	Write-Host -NoNewLine " "
 

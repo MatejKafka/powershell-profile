@@ -1,3 +1,6 @@
+Set-StrictMode -Version Latest
+Export-ModuleMember # don't export anything
+
 Set-PSReadLineKeyHandler -Key Shift+UpArrow -Function HistorySearchBackward
 Set-PSReadLineKeyHandler -Key Shift+DownArrow -Function HistorySearchForward
 Set-PSReadLineOption -HistorySearchCursorMovesToEnd

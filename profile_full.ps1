@@ -12,8 +12,11 @@ $InformationPreference = "Continue"
 $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # this shouldn't be necessary anymore
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
+# throw error when native command returns non-zero exit code
+$PSNativeCommandUseErrorActionPreference = $true
 
 
+# set global path to data directory, this is used by multiple other custom modules in this repository
 Set-PSDataRoot $PSScriptRoot\..\data
 
 
@@ -29,8 +32,6 @@ $env:LANG = "C.UTF-8"
 
 $_Times.setup = Get-Date
 
-# RGB colors for Write-Host
-Import-Module Pansies
 # custom functions
 Import-Module $PSScriptRoot\functions.psm1 -DisableNameChecking
 # custom private functions, not commited to git
@@ -50,12 +51,11 @@ $_Times.imports = Get-Date
 if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	# do not show custom banner (TODO, version, calendar,...) if set
 	if (-not (Test-Path Env:PS_NO_BANNER)) {
-		& $PSScriptRoot\banner.ps1
+		& $PSScriptRoot\Prompt\banner.ps1
 		$_Times.banner = Get-Date
 	}
 	# setup prompt
-	Import-Module $PSScriptRoot\FSNav
-	. $PSScriptRoot\prompt.ps1 $_Times
+	Import-Module $PSScriptRoot\Prompt\Prompt -ArgumentList @($_Times)
 	# setup ZLocation (my fork with some change)
 	Import-Module $PSScriptRoot\ZLocation\ZLocation
 }

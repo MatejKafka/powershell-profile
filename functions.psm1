@@ -261,4 +261,12 @@ function Get-CmdExecutionTime($index=-1) {
 }
 
 
+$NotebookPath = Get-PSDataPath "Notebook.txt"
+function Get-Notebook {
+	Get-Content -Raw $NotebookPath
+}
+function notes {
+	Open-TextFile $NotebookPath
+}
+
 Export-ModuleMember -Function * -Cmdlet * -Alias *
