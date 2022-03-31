@@ -21,7 +21,10 @@ function PadLine {
 	param($str, [switch]$NoNewLine, $ForegroundColor, $BackgroundColor)
 	
 	$cursorX = $rui.CursorPosition.X
-	Write-Host $str -NoNewLine -ForegroundColor $ForegroundColor -BackgroundColor $BackgroundColor
+	$WHArgs = @{}
+	if ($ForegroundColor) {$WHArgs.ForegroundColor = $ForegroundColor}
+	if ($BackgroundColor) {$WHArgs.BackgroundColor = $BackgroundColor}
+	Write-Host $str -NoNewLine @WHArgs
 	Write-Host (" " * ($Host.UI.RawUI.WindowSize.Width - $str.Length - $cursorX)) -NoNewLine:$NoNewLine 
 }
 
