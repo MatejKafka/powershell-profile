@@ -57,30 +57,30 @@ Function Get-LastCommandStatus {
 	# status string indicating outcome of previous command
 	$StatusStr = ""
 
-	# render output type of previous command, unless it resulted in an error
-	if ($LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
-		if ($LastCmdOutputTypes.Length -gt 1) {
-			$StatusStr += "[" + $LastCmdOutputTypes.Length + "]"
-		}
-		$StatusStr += $LastCmdOutputTypes[0].ToString() + " | "
-	}
-
-	# print exit code if error occurred
-	if ($ErrorOccurred) {
-		if ($LastExitCode -eq -1073741510) {
-			$StatusStr += "Ctrl-C | "
-		} elseif ($LastExitCode -eq 0) {
-			# error originates from powershell
-			$StatusStr += "Error | "
-		} else {
-			# error from external command
-			$StatusStr += [string]$LastExitCode + " | "
-		}
-	}
-
 	# print run time of last command, or startup time if this is the first time we're rendering prompt
 	$LastCmd = Get-History -Count 1
 	if ($null -ne $LastCmd) {
+		# render output type of previous command, unless it resulted in an error
+		if ($LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+			if ($LastCmdOutputTypes.Length -gt 1) {
+				$StatusStr += "[" + $LastCmdOutputTypes.Length + "]"
+			}
+			$StatusStr += $LastCmdOutputTypes[0].ToString() + " | "
+		}
+
+		# print exit code if error occurred
+		if ($ErrorOccurred) {
+			if ($LastExitCode -eq -1073741510 -or $LastCmd.ExecutionStatus -eq "Stopped") {
+				$StatusStr += "Ctrl-C | "
+			} elseif ($LastExitCode -eq 0) {
+				# error originates from powershell
+				$StatusStr += "Error | "
+			} else {
+				# error from external command
+				$StatusStr += [string]$LastExitCode + " | "
+			}
+		}
+
 		$ExecutionTime = $LastCmd.EndExecutionTime - $LastCmd.StartExecutionTime
 		$StatusStr += Format-TimeSpan $ExecutionTime
 	} else {
