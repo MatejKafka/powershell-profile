@@ -19,27 +19,10 @@ $UIColors = @{
 	PowerShellVersion = "DarkBlue"
 	Notebook = "Cyan"
 	TODO = "Yellow"
-
-	#LightTheme = @{
-	#	Error = @{
-	#		Color = [PoshCode.Pansies.RgbColor]"#F00000"
-	#		CwdColor = [PoshCode.Pansies.RgbColor]"#F00000"
-	#	}
-	#	Ok = @{
-	#		Color = [PoshCode.Pansies.RgbColor]"#333363"
-	#		CwdColor = [PoshCode.Pansies.RgbColor]"#666696"
-	#	}
-	#}
-	#DarkTheme = @{
-	#	Error = @{
-	#		Color = [PoshCode.Pansies.RgbColor]"#906060"
-	#		CwdColor = [PoshCode.Pansies.RgbColor]"#C99999"
-	#	}
-	#	Ok = @{
-	#		Color = [PoshCode.Pansies.RgbColor]"#666696"
-	#		CwdColor = [PoshCode.Pansies.RgbColor]"#9999C9"
-	#	}
-	#}
 }
+
+
+$PSStyle.FileInfo.Directory = $PSStyle.Foreground.BrightBlack
+
 
 Export-ModuleMember -Variable UIColors
