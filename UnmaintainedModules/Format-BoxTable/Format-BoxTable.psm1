@@ -12,8 +12,15 @@ function Format-BoxTable {
 		$Padding = 1,
 			[switch]
 		$AlignCenter,
-		$Color
+			[string]
+		$ForegroundColor,
+			[string]
+		$BackgroundColor
 	)
+
+	$WriteHostParams = @{}
+	if ($ForegroundColor) {$WriteHostParams.ForegroundColor = $ForegroundColor}
+	if ($BackgroundColor) {$WriteHostParams.BackgroundColor = $BackgroundColor}
 
 	if ($MyInvocation.ExpectingInput) {
 		# to get whole pipeline input as array
@@ -43,19 +50,19 @@ function Format-BoxTable {
 	$Spacing = " " * $TableMargin
 	
 	# top border
-	Write-Host ($Spacing + "╔" + "═" * $MaxLen + "╗") -ForegroundColor $color
+	Write-Host ($Spacing + "╔" + "═" * $MaxLen + "╗") @WriteHostParams 
 	
 	# header
 	$Margin = $MaxLen - $Header.Length
 	$LMargin = [Math]::Floor($Margin / 2)
-	Write-Host ($Spacing + "║" + " " * $LMargin + $Header + " " * ($Margin - $LMargin) + "║") -ForegroundColor $Color
+	Write-Host ($Spacing + "║" + " " * $LMargin + $Header + " " * ($Margin - $LMargin) + "║") @WriteHostParams
 
 	
 	$Rows | % {
 		$RightMargin = $MaxLen - $_.Length
-		Write-Host ($Spacing + "║" + " " * $MaxLen + "║") -ForegroundColor $Color
-		Write-Host ($Spacing + "║" + $_ + " " * $RightMargin + "║") -ForegroundColor $Color
+		Write-Host ($Spacing + "║" + " " * $MaxLen + "║") @WriteHostParams
+		Write-Host ($Spacing + "║" + $_ + " " * $RightMargin + "║") @WriteHostParams
 	}
 	
-	Write-Host ($Spacing + "╚" + "═" * $MaxLen + "╝") -ForegroundColor $color
+	Write-Host ($Spacing + "╚" + "═" * $MaxLen + "╝") @WriteHostParams
 }

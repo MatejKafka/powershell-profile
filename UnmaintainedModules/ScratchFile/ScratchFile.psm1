@@ -1,4 +1,4 @@
-#Requires -Modules Invoke-Notepad
+#Requires -Modules PSFileHandlers
 
 $SAVE_TO_HISTORY = $false
 
@@ -19,7 +19,7 @@ Function Invoke-Scratch([switch]$ContinueLast) {
 		$script:_LastTmpFile = $temp
 	}
 	Write-Host $temp
-	Invoke-Notepad $temp
+	Open-TextFile $temp
 	
 	$content = Get-Content -Raw $temp
 	if ($content -ne $null -and $content.Length -gt 0) {
@@ -31,7 +31,7 @@ Function Invoke-Scratch([switch]$ContinueLast) {
 			Import-Module -Force -Scope Global $temp
 		} finally {
 			# restore original content
-			Set-Content $temp $content
+			Set-Content $temp $content -NoNewline
 		}
 		
 		if ($SAVE_TO_HISTORY) {

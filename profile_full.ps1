@@ -20,8 +20,8 @@ $PSNativeCommandUseErrorActionPreference = $true
 Set-PSDataRoot $PSScriptRoot\..\data
 
 
-# add custom module directory
-$env:PSModulePath += [IO.Path]::PathSeparator + (Resolve-Path "$PSScriptRoot\CustomModules")
+# add custom module directories
+$env:PSModulePath = @($env:PSModulePath, (Resolve-Path $PSScriptRoot\CustomModules), (Resolve-Path $PSScriptRoot\UnmaintainedModules)) -join [IO.Path]::PathSeparator
 # set path where command history is saved
 Set-PSReadLineOption -HistorySavePath (Get-PSDataPath "ConsoleHost_history.txt")
 # set database path for ZLocation
