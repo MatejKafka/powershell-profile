@@ -61,31 +61,6 @@ function Get-Todo {
 	}
 }
 
-function Format-Todo {
-	param(
-			[Parameter(ValueFromPipeline)]
-		$Todos,
-		$Color
-	)
-
-	if ($MyInvocation.ExpectingInput) {
-		# to get whole pipeline input as array
-		$Todos = @($Input)
-	}
-
-	if ($Todos -eq $null) {
-		$Todos = Get-Todo
-	}
-
-	if (@($Todos).Count -eq 0) {
-		Write-Host "No TODOs." -ForegroundColor $Color
-	} else {
-		$TodoRows = $Todos | % {"($($_.Index)) " + $_.Todo}
-		Write-Host "TODO:" -ForegroundColor $Color
-		$TodoRows | % {Write-Host $_ -ForegroundColor $Color}
-	}
-}
-
 function Remove-Todo {
 	param(
 			[Parameter(Mandatory)]
