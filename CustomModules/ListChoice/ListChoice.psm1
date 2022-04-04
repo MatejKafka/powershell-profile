@@ -1,3 +1,6 @@
+Set-StrictMode -Version Latest
+
+
 function Read-HostListChoice {
 	[CmdletBinding()]
 	param(
