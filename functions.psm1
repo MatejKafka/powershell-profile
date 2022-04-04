@@ -21,6 +21,7 @@ New-Alias env Update-EnvVar
 New-Alias venv Activate-Venv
 New-Alias npp Invoke-Notepad
 New-Alias e Push-ExternalLocation
+New-Alias o Open-TextFile
 
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	# 2019
@@ -73,7 +74,7 @@ function so([ValidateSet("Left", "Right", "Active", "L", "R", "A")]$Pane = "Righ
 }
 <# Set current directory to the dir open in Altap Salamander. #>
 function s {
-	Get-AltapSalamanderDirectory | select -First 1 | % FullName | Push-Location
+	Get-AltapSalamanderDirectory | select -First 1 | % FullName | Set-Location
 }
 
 class _CommandName : System.Management.Automation.IValidateSetValuesGenerator {
@@ -156,9 +157,7 @@ function Get-Wifi {
 }
 
 function Push-ExternalLocation {
-	$Dirs = @()
-	$Dirs += Get-ExplorerDirectory
-	$Dirs += Get-AltapSalamanderDirectory
+	$Dirs = Get-FileManagerDirectory
 
 	$Clip = Get-Clipboard | select -First 1 # only get first line of clipboard
 	if (Test-Path -Type Container $Clip) {
@@ -169,7 +168,7 @@ function Push-ExternalLocation {
 
 	$Selected = Read-HostListChoice $Dirs -Prompt "Select directory to cd to:" `
 			-NoInputMessage "No Explorer, Altap Salamander or clipboard locations found."
-	Push-Location $Selected
+	Set-Location $Selected
 }
 
 function ssh-config {

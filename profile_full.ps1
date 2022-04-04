@@ -5,20 +5,22 @@ $_Times = @{
 
 Set-StrictMode -Version Latest
 # stop even on non-critical errors
-# unfortunately, this only works for cmdlets and functions, not native commands
 $ErrorActionPreference = "Stop"
+# throw error when native command returns non-zero exit code
+$PSNativeCommandUseErrorActionPreference = $true
 # show Information log stream
 $InformationPreference = "Continue"
 $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # this shouldn't be necessary anymore
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
-# throw error when native command returns non-zero exit code
-$PSNativeCommandUseErrorActionPreference = $true
 
 
 # set global path to data directory, this is used by multiple other custom modules in this repository
 Set-PSDataRoot $PSScriptRoot\..\data
 
+
+# create a new aliased drive for HKCR
+$null = New-PSDrive -PSProvider Registry -Root HKEY_CLASSES_ROOT -Name HKCR
 
 # add custom module directories
 $env:PSModulePath = @($env:PSModulePath, (Resolve-Path $PSScriptRoot\CustomModules), (Resolve-Path $PSScriptRoot\UnmaintainedModules)) -join [IO.Path]::PathSeparator
