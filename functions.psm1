@@ -37,7 +37,8 @@ function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 
 function todo ([string]$TodoText) {
 	if ([string]::IsNullOrEmpty($TodoText)) {
-		Get-Todo | Format-Todo -Color "#909060"
+		Write-HostColor "TODO:" -ForegroundColor "#909060"
+		Get-Todo | % {" $_"} | Write-HostColor -ForegroundColor "#909060"
 	} else {
 		New-Todo $TodoText
 	}

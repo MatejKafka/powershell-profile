@@ -17,8 +17,7 @@ $UIColors = @{
 		}
 	}
 	PowerShellVersion = "DarkBlue"
-	Notebook = "Cyan"
-	TODO = "Yellow"
+	Notebook = "#909060"
 }
 
 
