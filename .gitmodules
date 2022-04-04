@@ -5,3 +5,6 @@
 [submodule "CustomModules/ZLocation"]
 	path = ZLocation
 	url = git@github.com:MatejKafka/ZLocation.git
+[submodule "CustomModules/Write-HostColor"]
+	path = CustomModules/Write-HostColor
+	url = git@github.com:MatejKafka/Write-HostColor.git
