@@ -14,6 +14,9 @@ $PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # this shouldn't be necessary anymore
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
+# add custom module directories
+$env:PSModulePath = @($env:PSModulePath, (Resolve-Path $PSScriptRoot\CustomModules), (Resolve-Path $PSScriptRoot\UnmaintainedModules)) -join [IO.Path]::PathSeparator
+
 
 # set global path to data directory, this is used by multiple other custom modules in this repository
 Set-PSDataRoot $PSScriptRoot\..\data
@@ -22,8 +25,6 @@ Set-PSDataRoot $PSScriptRoot\..\data
 # create a new aliased drive for HKCR
 $null = New-PSDrive -PSProvider Registry -Root HKEY_CLASSES_ROOT -Name HKCR
 
-# add custom module directories
-$env:PSModulePath = @($env:PSModulePath, (Resolve-Path $PSScriptRoot\CustomModules), (Resolve-Path $PSScriptRoot\UnmaintainedModules)) -join [IO.Path]::PathSeparator
 # set path where command history is saved
 Set-PSReadLineOption -HistorySavePath (Get-PSDataPath "ConsoleHost_history.txt")
 # set database path for ZLocation
