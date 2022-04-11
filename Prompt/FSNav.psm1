@@ -1,4 +1,3 @@
-# Require -Modules Count
 Set-StrictMode -Version Latest
 
 Import-Module $PSScriptRoot\_Colors
@@ -52,7 +51,7 @@ function PrintItemList($baseCursor, $matching, $searchBuffer) {
 			PadLine $_.Substring($bufferLength) -ForegroundColor $TextColor
 			$CurrentHeight += 1
 		}
-		if ((count $matching) -gt $script:MaxListCount) {
+		if (@($matching).Count -gt $script:MaxListCount) {
 			PadLine -ForegroundColor $BaseColor (" ╚⸨ " + "... (+$($matching.Count - $script:MaxListCount))")
 			return
 		}
@@ -93,14 +92,14 @@ function DeleteNext($buffer, $items) {
 	if ($buffer -eq "") {
 		return ""
 	}
-	if ((count $items) -eq 0) {
+	if (-not $items) {
 		return ""
 	}
 	
-	$origCount = count (GetMatching $buffer $items)
+	$origCount = @(GetMatching $buffer $items).Count
 	do {
 		$buffer = $buffer.Substring(0, $buffer.Length - 1)
-	} while ((count (GetMatching $buffer $items)) -eq $origCount)
+	} while (@(GetMatching $buffer $items).Count -eq $origCount)
 	
 	return $buffer
 }
@@ -164,7 +163,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 			$matching = GetMatching $script:buffer $dirs
 		}
 		
-		if ($script:buffer -in $matching -and (count $matching) -eq 1) {
+		if ($script:buffer -in $matching -and @($matching).Count -eq 1) {
 			# we have single exact match
 			SelectItem $matching
 			Refresh
@@ -230,7 +229,7 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		
 		if ($key.Character -ge 32 -and $key.Character -lt 127) {
 			# only complete if it matches some dir
-			if ((count (GetMatching ($script:buffer + $key.Character) $dirs)) -gt 0) {
+			if (@(GetMatching ($script:buffer + $key.Character) $dirs).Count -gt 0) {
 				$script:buffer += $key.Character
 			}
 		}
