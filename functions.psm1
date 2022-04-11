@@ -2,18 +2,21 @@ Set-StrictMode -Version Latest
 
 
 New-Alias ipy ipython
+New-Alias rms Remove-ItemSafely
+
+if ($IsWindows) {
 # where is masked by builtin alias for Where-Object
-New-Alias which where.exe
-New-Alias py python3.exe
-New-Alias python python3.exe
+	New-Alias which where.exe
+	New-Alias py python3.exe
+	New-Alias python python3.exe
 
-Remove-Alias rm
-New-Alias rm Remove-ItemSafely
-New-Alias rmp Remove-Item
-New-Alias grep Select-String
+	New-Alias grep Select-String
+}
 
-Remove-Alias diff -Force
-New-Alias diff delta.exe
+if (Get-Command delta.exe) {
+	Remove-Alias diff -Force -ErrorAction Ignore
+	New-Alias diff delta.exe
+}
 
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch

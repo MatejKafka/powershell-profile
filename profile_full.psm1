@@ -1,16 +1,18 @@
-﻿# read current time for startup measurement
+﻿#Requires -Version 7.2
+
+# read current time for startup measurement
 $_Times = @{
 	internal = Get-Date
 }
 
 Set-StrictMode -Version Latest
 # stop even on non-critical errors
-$ErrorActionPreference = "Stop"
+$global:ErrorActionPreference = "Stop"
 # throw error when native command returns non-zero exit code
-$PSNativeCommandUseErrorActionPreference = $true
+$global:PSNativeCommandUseErrorActionPreference = $true
 # show Information log stream
-$InformationPreference = "Continue"
-$PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
+$global:InformationPreference = "Continue"
+$global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # this shouldn't be necessary anymore
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
@@ -22,8 +24,10 @@ $env:PSModulePath = @($env:PSModulePath, (Resolve-Path $PSScriptRoot\CustomModul
 Set-PSDataRoot $PSScriptRoot\..\data
 
 
-# create a new aliased drive for HKCR
-$null = New-PSDrive -PSProvider Registry -Root HKEY_CLASSES_ROOT -Name HKCR
+if ($IsWindows) {
+	# create a new aliased drive for HKCR
+	$null = New-PSDrive -PSProvider Registry -Root HKEY_CLASSES_ROOT -Name HKCR
+}
 
 # set path where command history is saved
 Set-PSReadLineOption -HistorySavePath (Get-PSDataPath "ConsoleHost_history.txt")
@@ -63,4 +67,3 @@ if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	Import-Module $PSScriptRoot\ZLocation\ZLocation
 }
 
-Remove-Variable _Times

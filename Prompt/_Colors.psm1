@@ -1,27 +1,27 @@
 Set-StrictMode -Version Latest
 
-# RGB colors for Write-Host, not needed now
-#Import-Module Pansies
+# I use weird color scheme in my terminal, so that my custom prompt with non-default colors will look good in both dark and light mode.
+# These colors will probably look really weird in your terminal.
+# I've noted the real colors for dark mode in comments for each value.
 
-# I use weird color theme in my terminal, so that I can avoid importing Pansies and using full RGB output,
-#  so these colors probably won't look right in your terminal
+# These values are used by other modules in the Prompt directory.
+# Any value accepted by the Write-HostColor function is OK (in particular, hex-based CSS colors).
 $UIColors = @{
 	Prompt = @{
 		Ok = @{
-			Base = "DarkBlue"
-			Highlight = "Blue"
+			Base = "DarkBlue" # real color: #666696
+			Highlight = "Blue" # real color: #9999C9
 		}
 		Error = @{
-			Base = "Cyan"
-			Highlight = "DarkRed"
+			Base = "Cyan" # real color: #906060 (this one will look particularly bad with a default color scheme)
+			Highlight = "DarkRed" # real color: #C99999
 		}
 	}
-	PowerShellVersion = "DarkBlue"
+	PowerShellVersion = "DarkBlue" # real color: #666696
 	Notebook = "#909060"
 }
 
-
-$PSStyle.FileInfo.Directory = $PSStyle.Foreground.BrightBlack
+$global:PSStyle.FileInfo.Directory = $PSStyle.Foreground.BrightBlack
 
 
 Export-ModuleMember -Variable UIColors

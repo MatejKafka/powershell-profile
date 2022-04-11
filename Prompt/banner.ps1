@@ -5,6 +5,6 @@ Write-HostColor ("PowerShell v" + [string]$PSVersionTable.PSVersion) `
 
 $NotebookStr = Get-Notebook
 if (-not [string]::IsNullOrWhitespace($NotebookStr)) {
-	Write-HostColor "`n"
+	Write-HostColor ""
 	Write-HostColor $NotebookStr -ForegroundColor $UIColors.Notebook
 }

@@ -1,29 +1,62 @@
 # powershell-profile
-Snippets from my Powershell 7 profile directory.
+My heavily customized Powershell 7 profile directory. Primarily developed for Windows, but it also seems to run on Linux.
 
-## `./CustomModules`
+## Installation
+
+```powershell
+# clone this repository wherever you prefer
+git clone https://github.com/MatejKafka/powershell-profile
+# clone git submodules
+git submodule update --init --recursive
+
+cd powershell-profile
+# symlink the main profile from $PROFILE (default profile file path)
+New-Item -Type SymbolicLink $PROFILE -Target (Resolve-Path ./Microsoft.PowerShell_profile.ps1)
+```
+
+## Setup (issues)
+
+### Nothing loads?
+
+If you're not running in Windows Terminal, nothing will be loaded. I have it setup this way to make PowerShell load faster when invoked inside an IDE or from a script that does not specify the `-noprofile` PowerShell option. If you want to always load the profile, open `.\Microsoft.PowerShell_profile.ps1` in a text editor and remove the `if` condition around the last line, where `$PSScriptRoot\profile_full` is imported.
+
+### Some error is thrown from `Set-PSDataRoot` during startup?
+
+This function is called in `profile_full.psm1`. Over time, I wrote multiple custom PowerShell modules that needed to store data somewhere (RSS feeds, TODO,...). To make this data directory configurable, all these modules get the data path from the custom `PSDirectories` module. Root of the data path is configured by calling `Set-PSDataRoot` during the profile setup. Change this to a directory of your choosing.
+
+### The colors look really weird?
+
+See `Prompt/_Colors.psm1` for explanation.
+
+### `Ctrl-d` does not work as EOF?
+
+I'm a Windows guy, so I don't need `Ctrl-d`, and I'm using it to open `FSNav` (see below) instead. If you don't like that, change the key-binding in `Prompt/FSNav.psm1`
+
+## Module description
+
+### `./CustomModules`
 
 Directory of custom modules, either made by me, or copied from the internet (source is noted in manifest file where applicable).
 
-## `profile_entry.ps1`
+### `Microsoft.PowerShell_profile.ps1`
 
-Basic profile script, loaded by PowerShell on startup. I have it symlinked from the default `Documents\Powershell\Microsoft.PowerShell_profile.ps1` path. Checks if we're running in Windows Terminal, and imports the main profile script if so.
+Base profile script, loaded by PowerShell on startup. I have it symlinked from the default `Documents\Powershell\Microsoft.PowerShell_profile.ps1` path. Checks if we're running in Windows Terminal, and imports the main profile module if so.
 
-## `profile_full.ps1`
-Main profile script, sets sane defaults for error handling and imports other parts.
+### `profile_full.psm1`
 
-## `prompt.ps1`
+Main profile module, imported from the previous script. Sets sane defaults for error handling, sets up some data and module paths and imports other parts of the profile, most notably the custom prompt and custom functions.
+
+### `Prompt/Prompt.psm1`
+
 Custom Powershell 7 prompt, showing last command run time, its return type (currently shows the first one, with item count prepended in case multiple values are returned) and return code (if the command did not finish correctly).
 
-Also supports python venv (activate with `Activate-Venv`, indicator is then added to prompt; deactivate as usual with `deactivate`).
-
-**Requires the Pansies module (https://www.powershellgallery.com/packages/Pansies) for RGB color support.**
+Also shows git status and python virtual env (activate with `Activate-Venv`, indicator is then added to the prompt; deactivate as usual with `deactivate`).
 
 <br>
 
 ![Screenshot of pwsh.exe](https://i.imgur.com/11lNgtK.png)
 
-## `FSNav.psm1`
+### `Prompt/FSNav.psm1`
 Adds a `Ctrl+d` hotkey that allows you to navigate folders just by typing parts of the desired directory, similar to GUI file managers.
 Also adds `Ctrl+UpArrow`, equivalent to `cd ..`.
 
