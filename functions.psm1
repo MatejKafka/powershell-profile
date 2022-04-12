@@ -26,6 +26,17 @@ New-Alias npp Invoke-Notepad
 New-Alias e Push-ExternalLocation
 New-Alias o Open-TextFile
 
+
+function .. {
+	cd ..
+}
+
+<# "mkdir and enter" #>
+function mke($Path) {
+	$null = mkdir $Path
+	cd $Path
+}
+
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	# 2019
 	#& 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
