@@ -87,7 +87,7 @@ Function Get-LastCommandStatus {
 		# we just started up, display startup time
 		if ($script:FirstPromptTime -eq $null) {
 			$script:FirstPromptTime = Get-Date
-			$Times.prompt = $script:FirstPromptTime
+			$script:Times.prompt = $script:FirstPromptTime
 		}
 
 		$LoadStartTime = (Get-Process -Id $pid).StartTime
@@ -95,7 +95,7 @@ Function Get-LastCommandStatus {
 		$StatusStr += "startup: " + (Format-TimeSpan $StartupTime)
 
 		$Sorted = ,@{Name = $null; Value = $LoadStartTime}
-		$Sorted += $Times.GetEnumerator() | sort -Property Value
+		$Sorted += $script:Times.GetEnumerator() | Sort-Object -Property Value
 		$TimeStrings = @()
 		for ($i = 1; $i -lt $Sorted.Count; $i += 1) {
 			$_ = $Sorted[$i]
