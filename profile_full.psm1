@@ -45,13 +45,12 @@ Import-Module $PSScriptRoot\functions.psm1 -DisableNameChecking
 if (Test-Path $PSScriptRoot\functions_custom.psm1) {
 	Import-Module $PSScriptRoot\functions_custom.psm1 -DisableNameChecking
 }
-# native command arg completers
-Import-Module ArgumentCompleters
+
+$_Times.imports = Get-Date
+
 
 # reload path from system env
 Update-EnvVar Path
-
-$_Times.imports = Get-Date
 
 
 # do not setup custom prompt and banner if set
@@ -63,7 +62,31 @@ if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	}
 	# setup prompt
 	Import-Module $PSScriptRoot\Prompt\Prompt -ArgumentList @($_Times)
-	# setup ZLocation (my fork with some change)
-	Import-Module $PSScriptRoot\ZLocation\ZLocation
 }
 
+
+# delay the load of modules that take a long time to load, and are not immediately needed
+# OnIdle is triggered when user hasn't typed anything in 300ms and the input buffer is empty;
+# often, this is all loaded before the user starts typing the first command
+#
+# to not block for too long if the OnIdle event triggers just before user starts typing a command,
+#  the loading is split into multiple stages (apparently creating multiple event listeners on top
+#  level always fires them one after another, without checking if the engine is still idle between them)
+Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
+	if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
+		# setup ZLocation (my fork with some change)
+		Import-Module -Global $PSScriptRoot\ZLocation\ZLocation
+	}
+
+	Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
+		# native command arg completers
+		Import-Module -Global ArgumentCompleters
+
+		Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
+			# among others, completions for git
+			if (Get-Module posh-git -ListAvailable) {
+				Import-Module -Global posh-git
+			}
+		}
+	}
+}
