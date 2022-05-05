@@ -10,12 +10,13 @@ if ($IsWindows) {
 	New-Alias py python.exe
 
 	New-Alias grep Select-String
+
+	if (Get-Command delta.exe) {
+		Remove-Alias diff -Force -ErrorAction Ignore
+		New-Alias diff delta.exe
+	}
 }
 
-if (Get-Command delta.exe) {
-	Remove-Alias diff -Force -ErrorAction Ignore
-	New-Alias diff delta.exe
-}
 
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
