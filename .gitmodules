@@ -1,10 +1,10 @@
 [submodule "CustomModules/ArgumentCompleters"]
 	path = CustomModules/ArgumentCompleters
-	url = git@github.com:MatejKafka/PowerShell-ArgumentCompleters.git
-
-[submodule "CustomModules/ZLocation"]
+	url = https://github.com/MatejKafka/PowerShell-ArgumentCompleters
+[submodule "ZLocation"]
 	path = ZLocation
-	url = git@github.com:MatejKafka/ZLocation.git
+	url = https://github.com/MatejKafka/ZLocation/
 [submodule "CustomModules/Write-HostColor"]
 	path = CustomModules/Write-HostColor
-	url = git@github.com:MatejKafka/Write-HostColor.git
+	url = https://github.com/MatejKafka/Write-HostColor
+
