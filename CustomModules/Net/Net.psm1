@@ -131,7 +131,7 @@ function Copy-SshId {
 }
 
 
-function Get-IpAddress {
+function Get-IPAddress {
 	Get-NetIPAddress
 #		| ? AddressFamily -eq "IPv4"
 		| ? SuffixOrigin -in @("Dhcp", "Manual")
@@ -140,4 +140,4 @@ function Get-IpAddress {
 		| select InterfaceAlias, IPAddress
 }
 
-New-Alias ip Get-IpAddress
+New-Alias ip Get-IPAddress
