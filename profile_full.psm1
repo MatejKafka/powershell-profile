@@ -17,7 +17,12 @@ $global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 #$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
 # add custom module directories
-$env:PSModulePath = @($env:PSModulePath, (Resolve-Path $PSScriptRoot\CustomModules), (Resolve-Path $PSScriptRoot\UnmaintainedModules)) -join [IO.Path]::PathSeparator
+$env:PSModulePath = @(
+	$env:PSModulePath,
+	(Resolve-Path $PSScriptRoot\CustomModules),
+	(Resolve-Path $PSScriptRoot\UnmaintainedModules)
+	(Resolve-Path $PSScriptRoot\ZLocation) # custom ZLocation fork
+) -join [IO.Path]::PathSeparator
 
 
 # set global path to data directory, this is used by multiple other custom modules in this repository
@@ -75,7 +80,9 @@ if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
 	if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 		# setup ZLocation (my fork with some change)
-		Import-Module -Global $PSScriptRoot\ZLocation\ZLocation
+		# if user types `z` immediately after prompt loads, this will not be loaded yet,
+		#  so he'll have to wait for a bit, but the command will still work
+		Import-Module -Global ZLocation
 	}
 
 	Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
