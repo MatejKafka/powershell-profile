@@ -1,4 +1,4 @@
-Import-Module $PSScriptRoot\_Colors
+Import-Module $PSScriptRoot\Colors
 
 Write-HostColor ("PowerShell v" + [string]$PSVersionTable.PSVersion) `
 		-ForegroundColor $UIColors.PowerShellVersion

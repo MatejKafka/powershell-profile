@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 
-Import-Module $PSScriptRoot\_Colors
+Import-Module $PSScriptRoot\Colors
 
 # hacked together, needs rewrite
 

@@ -7,7 +7,7 @@ param(
 Set-StrictMode -Version Latest
 Export-ModuleMember # don't export anything
 
-Import-Module $PSScriptRoot\_Colors
+Import-Module $PSScriptRoot\Colors
 Import-Module $PSScriptRoot\PSReadLineOptions
 Import-Module $PSScriptRoot\FSNav
 
@@ -35,7 +35,7 @@ Function Write-HostLineEnd($message, $foregroundColor, $dy = 0) {
 	$targetCursor.Y += $dy
 
 	$Host.UI.RawUI.CursorPosition = $targetCursor
-	Write-Host $message -NoNewLine -ForegroundColor $foregroundColor
+	Write-HostColor $message -NoNewLine -ForegroundColor $foregroundColor
 
 	$Host.UI.RawUI.CursorPosition = $origCursor
 }
@@ -130,7 +130,7 @@ function Get-GitDirectory {
 
 Function Write-ShellStatus($InfoColor) {
 	function Write-InfoStatus($Status) {
-		Write-Host "($Status)" -NoNewLine -ForegroundColor $InfoColor
+		Write-HostColor "($Status)" -NoNewLine -ForegroundColor $InfoColor
 	}
 
 	# show if we're inside a MSVC Developer shell
@@ -157,7 +157,7 @@ Function Write-ShellStatus($InfoColor) {
 			Write-InfoStatus $GitStr
 		}
 	} else {
-		Write-Host "(X)" -NoNewLine -ForegroundColor "Red"
+		Write-HostColor "(X)" -NoNewLine -ForegroundColor "Red"
 	}
 }
 
@@ -173,7 +173,7 @@ Function global:Prompt {
 
 	if ($Host.UI.RawUI.CursorPosition.Y -eq 0) {
 		# screen was cleared, create offset for our prompt
-		Write-Host ""
+		Write-HostColor ""
 	}
 
 
@@ -191,15 +191,15 @@ Function global:Prompt {
 
 
 	# write horizontal separator
-	Write-Host ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
-	Write-Host	"╚╣" -NoNewLine -ForegroundColor $Color
+	Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
+	Write-HostColor "╚╣" -NoNewLine -ForegroundColor $Color
 	Write-ShellStatus $Color
-	Write-Host -NoNewLine " "
+	Write-HostColor -NoNewLine " "
 
 	$CwdString = [string](Get-Location)
 	
 	# write the prompt itself
-	Write-Host $CwdString -NoNewLine -ForegroundColor $CwdColor
+	Write-HostColor $CwdString -NoNewLine -ForegroundColor $CwdColor
 
 	# set indent of continuation prompt to match the main prompt (so that multiline code in the prompt has no jumps between lines)
 	Set-PSReadLineOption -ContinuationPrompt (" " * [math]::max(0, $Host.UI.RawUI.CursorPosition.X - 1) + ">> ")

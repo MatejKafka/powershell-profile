@@ -24,9 +24,9 @@ If you're not running in Windows Terminal, nothing will be loaded. I have it set
 
 This function is called in `profile_full.psm1`. Over time, I wrote multiple custom PowerShell modules that needed to store data somewhere (RSS feeds, TODO,...). To make this data directory configurable, all these modules get the data path from the custom `PSDirectories` module. Root of the data path is configured by calling `Set-PSDataRoot` during the profile setup. Change this to a directory of your choosing.
 
-### The colors look really weird?
+### How do I change the color scheme?
 
-See `Prompt/_Colors.psm1` for explanation.
+Modify the color scheme file `PromptColorScheme.psd1` in the data directory (see the previous issue about `Set-PSDataRoot` to know where to look).
 
 ### `Ctrl-d` does not work as EOF?
 
