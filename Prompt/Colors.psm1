@@ -5,7 +5,7 @@ $ColorSchemePath = Get-PSDataPath "PromptColorScheme.psd1" `
 
 # https://github.com/PowerShell/PowerShell/issues/12789
 $null = Import-PowerShellDataFile $ColorSchemePath
-$UIColors = Invoke-Expression (cat -Raw $ColorSchemePath)
+$UIColors = Invoke-Expression (Get-Content -Raw $ColorSchemePath)
 
 # run the custom setup script
 $null = & $UIColors.SetupScript
