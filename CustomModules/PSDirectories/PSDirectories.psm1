@@ -13,7 +13,7 @@ function Set-PSDataRoot {
 	param([Parameter(Mandatory)][string]$DataRoot)
 
 	if (-not (Test-Path -Type Container $DataRoot)) {
-		New-Item -Type Directory $DataRoot
+		throw "Set-PSDataRoot: Tried to set PSDataRoot to a non-existent directory: $DataRoot"
 	}
 	$script:DataRoot = Resolve-Path $DataRoot
 }
@@ -33,7 +33,7 @@ function Get-PSDataPath {
 	}
 
 	if (-not $script:DataRoot) {
-		throw "Get-PSDataPath: PSDataRoot not set, should be initialized in `$PROFILE."
+		throw "Get-PSDataPath: PSDataRoot not set, should be initialized in `$PROFILE during PowerShell startup by calling 'Set-PSDataRoot <path>'."
 	}
 
 	$Path = Join-Path $DataRoot $Name
