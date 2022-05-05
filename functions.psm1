@@ -5,10 +5,9 @@ New-Alias ipy ipython
 New-Alias rms Remove-ItemSafely
 
 if ($IsWindows) {
-# where is masked by builtin alias for Where-Object
+	# where is masked by builtin alias for Where-Object
 	New-Alias which where.exe
-	New-Alias py python3.exe
-	New-Alias python python3.exe
+	New-Alias py python.exe
 
 	New-Alias grep Select-String
 }
@@ -20,7 +19,6 @@ if (Get-Command delta.exe) {
 
 New-Alias / Invoke-Scratch
 New-Alias // Invoke-LastScratch
-New-Alias env Update-EnvVar
 New-Alias venv Activate-Venv
 New-Alias npp Invoke-Notepad
 New-Alias e Push-ExternalLocation
@@ -37,6 +35,13 @@ function mke($Path) {
 	cd $Path
 }
 
+<# remove dir and cd .. #>
+function rme {
+	$wd = Get-Location
+	cd ..
+	rm -Recurse -Force $wd
+}
+
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	# 2019
 	#& 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
@@ -45,9 +50,12 @@ function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	
 	# replacement manual script
 	$VsWherePath = Join-Path ${env:ProgramFiles(x86)} "\Microsoft Visual Studio\Installer\vswhere.exe"
-	$VsPath = & $VsWherePath -Property InstallationPath
+	$VsPath = & $VsWherePath -products * -latest -property installationPath
+	if ($null -eq $VsPath) {
+		throw "'vswhere.exe' could not find any MSVC installation."
+	}
 	Import-Module (Join-Path $VsPath "\Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
-	Enter-VsDevShell -Arch $Arch -VsInstallPath $VsPath
+	Enter-VsDevShell -Arch $Arch -HostArch amd64 -VsInstallPath $VsPath
 }
 
 function todo ([string]$TodoText) {
@@ -79,11 +87,11 @@ function Get-LatestEmail($HowMany, $ConfigFile) {
 
 
 <# Open current directory in Altap Salamander. #>
-function so([ValidateSet("Left", "Right", "Active", "L", "R", "A")]$Pane = "Right") {
+function so([ValidateSet("Left", "Right", "Active", "L", "R", "A")]$Pane = "Right", $Path = (Get-Location)) {
 	& "C:\Program Files\Altap Salamander\salamand.exe" $(switch -Wildcard ($Pane) {
-		L* {"-O", "-P", 1, "-L", (pwd)}
-		R* {"-O", "-P", 2, "-R", (pwd)}
-		A* {"-O", "-A", (pwd)}
+		L* {"-O", "-P", 1, "-L", $Path}
+		R* {"-O", "-P", 2, "-R", $Path}
+		A* {"-O", "-A", $Path}
 	})
 }
 <# Set current directory to the dir open in Altap Salamander. #>
@@ -102,19 +110,29 @@ function edit {
 			[Parameter(Mandatory)]
 			[ValidateSet([_CommandName])]
 			[string]
-		$CommandName
+		$CommandName,
+			[switch]
+		$Gui
 	)
 
 	$Cmd = Get-Command $CommandName -Type Alias, Cmdlet, ExternalScript, "Function"
-	$Path = switch ($Cmd.CommandType) {
-		Alias {$Cmd.ResolvedCommand.Module.Path}
-		ExternalScript {$Cmd.Source}
-		default {$Cmd.Module.Path}
+	while ($Cmd.CommandType -eq "Alias") {
+		# resolve alias
+		$Cmd = $Cmd.ResolvedCommand
 	}
 
-	if ($Path) {
-		# this should open the file in editor, not execute it
-		& $Path
+	$EditorArgs = switch ($Cmd.CommandType) {
+		ExternalScript {$Cmd.Source}
+		"Function" {@($Cmd.ScriptBlock.File, $Cmd.ScriptBlock.StartPosition.StartLine)}
+		Cmdlet {
+			# we cannot edit cmdlet, it's a DLL; instead, open the module directory
+			explorer $Cmd.Module.ModuleBase
+			return
+		}
+	}
+
+	if ($EditorArgs) {
+		Open-TextFile @EditorArgs -Gui:$Gui
 	} else {
 		throw "Could not find path of the module containing the command '$CommandName'."
 	}
@@ -171,7 +189,7 @@ function Get-Wifi {
 }
 
 function Push-ExternalLocation {
-	$Dirs = Get-FileManagerDirectory
+	[array]$Dirs = Get-FileManagerDirectory
 
 	$Clip = Get-Clipboard | select -First 1 # only get first line of clipboard
 	if (Test-Path -Type Container $Clip) {
@@ -195,7 +213,7 @@ function oris {
 }
 
 function BulkRename() {
-	[array]$Items = ls @Args
+	[array]$Items = Get-Item @Args
 	if ($null -eq $Items) {throw "No items to rename"}
 	$TempFile = New-TemporaryFile
 	$Items | select -ExpandProperty Name | Out-File $TempFile
@@ -206,14 +224,35 @@ function BulkRename() {
 		throw "You must not add, delete or reorder lines"
 	}
 
-	$Renamed = 0
+	$Renames = @()
 	for ($i = 0; $i -lt $Items.Count; $i++) {
 		if ($Items[$i].Name -ne $NewNames[$i]) {
-			Rename-Item $Items[$i] $NewNames[$i]
-			$Renamed++
+			$Renames += ,@($Items[$i], $NewNames[$i])
 		}
 	}
-	Write-Host "Renamed $Renamed items."
+
+	Write-Host "The following items will be renamed:"
+	$Renames | % {
+		Write-Host "    $($_[0]) -> $($_[1])"
+	}
+
+	if (@($Renames).Count -eq 0) {
+		Write-Host "No files renamed."
+		return
+	}
+
+	$Options = @("&Yes", "&No")
+	$Continue = switch ($Host.UI.PromptForChoice("Execute renames?", $null, $Options, 0)) {
+		0 {$true} # Yes
+		1 {$false} # No
+	}
+
+	if ($Continue) {
+		$Renames | % {Rename-Item $_[0] $_[1]}
+		Write-Host "Renamed $(@($Renames).Count) items."
+	} else {
+		Write-Host "Rename aborted."
+	}
 }
 
 function Activate-Venv([string]$VenvName) {

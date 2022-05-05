@@ -3,6 +3,8 @@ Export-ModuleMember # don't export anything
 
 Set-PSReadLineKeyHandler -Key Shift+UpArrow -Function HistorySearchBackward
 Set-PSReadLineKeyHandler -Key Shift+DownArrow -Function HistorySearchForward
+Set-PSReadLineKeyHandler -Key Enter -Function ValidateAndAcceptLine
+
 Set-PSReadLineOption -HistorySearchCursorMovesToEnd
 # disable default history handler, which filters "sensitive" commands from being written to the history file
 #  (see https://github.com/PowerShell/PSReadLine/issues/3243)
@@ -15,6 +17,9 @@ Set-PSReadLineOption -PredictionSource History
 Set-PSReadLineOption -PromptText "> "
 # inform PSReadLine that our prompt has 2 lines
 Set-PSReadLineOption -ExtraPromptLineCount 1
+
+# increase history file size
+Set-PSReadLineOption -MaximumHistoryCount 100000
 
 Set-PSReadLineOption -Colors @{ InlinePrediction = '#555555'}
 
