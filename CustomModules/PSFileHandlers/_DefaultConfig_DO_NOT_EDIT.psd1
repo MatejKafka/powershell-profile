@@ -5,7 +5,11 @@
 	TextEditor = @{
 		<# This entry is used when `Open-TextFile` is called without the `-GUI` switch.
 		   It should block until user closes the editor, but it doesn't have to be a console application. #>
-		Terminal = {param($Path) Start-Process notepad.exe -ArgumentList $Path -Wait}
+		Terminal = {
+			param($File, $LineNumber)
+			[array]$Options = if ($null -ne $LineNumber) {"+$LineNumber"}
+			vim @Options $File
+		}
 		<# This entry is used when `Open-TextFile` is called with the `-GUI` switch. #>
 		GUI = "notepad.exe"
 	}

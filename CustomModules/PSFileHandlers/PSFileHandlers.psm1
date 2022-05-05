@@ -5,22 +5,30 @@ $script:ConfigPath = Get-PSDataPath "FileHandlers.psd1" `
 
 
 function ReadConfig {
+	# validate that the config file is valid .psd1
+	$null = Import-PowerShellDataFile $ConfigPath
 	# you may be asking, "why not use Import-PowerShellDataFile instead?"
 	#  https://github.com/PowerShell/PowerShell/issues/12789, that's why
 	return Invoke-Expression (Get-Content -Raw $ConfigPath)
 }
 
-function OpenItem($ItemConfig, $Item) {
-	if ($ItemConfig -is [string]) {
-		& (Get-Command $ItemConfig) $Item
-	} elseif ($ItemConfig -is [object[]]) {
-		$Command = $ItemConfig[0]
-		$CmdArgs = $ItemConfig | select -Skip 1
-		& (Get-Command $ItemConfig) @CmdArgs $Item
-	} elseif ($ItemConfig -is [scriptblock]) {
-		& $ItemConfig $Item
+function OpenItem($ItemConfig, $Item, $ExtraArgs) {
+	if ($ItemConfig -is [scriptblock]) {
+		& $ItemConfig $Item @ExtraArgs
 	} else {
-		throw "Invalid value in config file, must be either command string, argument array, or a scriptblock: $ItemConfig (config file path: '$ConfigPath')"
+		# FIXME: hacky
+		if ($null -ne $ExtraArgs) {
+			Write-Warning "PSFileHandlers: Passing -LineNumber is only supported when the file handler is defined as a ScriptBlock in the config file at '$ConfigPath'."
+		}
+		if ($ItemConfig -is [string]) {
+			& (Get-Command $ItemConfig) $Item
+		} elseif ($ItemConfig -is [object[]]) {
+			$Command = $ItemConfig[0]
+			$CmdArgs = $ItemConfig | select -Skip 1
+			& (Get-Command $ItemConfig) @CmdArgs $Item
+		} else {
+			throw "Invalid value in config file, must be either command string, argument array, or a scriptblock: $ItemConfig (config file path: '$ConfigPath')"
+		}
 	}
 }
 
@@ -53,6 +61,8 @@ function Open-TextFile {
 				else {throw "File does not exist, or it's a directory: $_"}
 			})]
 		$Path,
+			[Nullable[uint64]]
+		$LineNumber,
 			[switch]
 		$Gui
 	)
@@ -63,11 +73,12 @@ function Open-TextFile {
 
 	process {
 		$Path = Resolve-Path $Path
+		$ExtraArgs = if ($null -ne $LineNumber) {@($LineNumber)} else {$null}
 
 		if ($Gui) {
-			OpenItem $Config.TextEditor.GUI $Path
+			OpenItem $Config.TextEditor.GUI $Path -ExtraArgs $ExtraArgs
 		} else {
-			OpenItem $Config.TextEditor.Terminal $Path
+			OpenItem $Config.TextEditor.Terminal $Path -ExtraArgs $ExtraArgs
 		}
 	}
 }
