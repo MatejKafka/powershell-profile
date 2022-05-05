@@ -7,13 +7,26 @@ My heavily customized Powershell 7 profile directory. Primarily developed for Wi
 
 ## Installation
 
-Run this in PowerShell Core:
+### Install directly to the PowerShell profile directory
+
+```powershell
+# clone this repository and initialize submodules
+$ConfigDir = Split-Path $PROFILE
+git clone https://github.com/MatejKafka/powershell-profile $ConfigDir
+cd $ConfigDir
+git submodule update --init --recursive
+
+# if you want git autocompetion, also install posh-git
+Install-Module posh-git
+```
+
+### Install to a custom directory
 
 ```powershell
 # clone this repository wherever you prefer
 git clone https://github.com/MatejKafka/powershell-profile
 cd powershell-profile
-# clone git submodules
+# initialize submodules
 git submodule update --init --recursive
 
 # symlink the main profile from $PROFILE (default profile file path)
@@ -33,7 +46,12 @@ If you're not running in Windows Terminal, nothing will be loaded. I have it set
 
 This function is called in `profile_full.psm1`. Over time, I wrote multiple custom PowerShell modules that needed to store data somewhere (RSS feeds, TODO,...). To make this data directory configurable, all these modules get the data path from the custom `PSDirectories` module.
 
-Root directory of the data path is configured by calling `Set-PSDataRoot` during the profile setup. Change this to a directory of your choosing – default is `$PSScriptRoot\..\data`, a reasonable choice on a Windows install would be something like `"$env:APPDATA\powershell-profile"`.
+Root directory of the data path is configured by calling `Set-PSDataRoot` during the profile setup. I use the path `$PSScriptRoot\..\data`, which most probably doesn't make sense on any other setup than mine. :) A reasonable better choice might be:
+
+- Windows: `$env:APPDATA\powershell-profile`
+- Linux: `~/.local/share/powershell-profile`
+
+Note that as a safeguard, you must create the directory manually. This is the default so that the directory isn't accidentally created in the wrong (default) spot.
 
 ### How do I change the color scheme?
 
