@@ -4,8 +4,8 @@
 	GUID = '36ac4530-94f4-4858-a941-2696c45897ac'
 	Author = "Matej Kafka"
 	
-	FunctionsToExport = @("Get-RSSFeed", "Invoke-RSSItem", "Invoke-RSS", "Read-RSSFeedFile", "Show-RSSItem", "Edit-RSSDefaultFeedFile")
+	FunctionsToExport = @("Read-RSSFeed", "Invoke-RSSItem", "Invoke-RSS", "Read-RSSFeedFile", "Read-RSSDefaultFeed", "Edit-RSSDefaultFeedFile")
 	CmdletsToExport = @()
 	VariablesToExport = @()
-	AliasesToExport = @("rss", "rss-edit")
+	AliasesToExport = @("rss-list", "rss-edit")
 }

@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 class RSSSource {
 	[string]$Title
@@ -13,7 +14,7 @@ class RSSSource {
 class RSSItem {
 	hidden [RSSSource]$RssFeed
 	hidden [string]$Uri
-	[DateTime]$Published
+	[Nullable[DateTime]]$Published
 	[string]$Author
 	[string]$Title
 
@@ -25,14 +26,6 @@ class RSSItem {
 		$this.Title = $Title
 	}
 
-	RSSItem($RssItem) {
-		$this.RssFeed = $RssItem.RssFeed
-		$this.Uri = $RssItem.Uri
-		$this.Published = $RssItem.Published
-		$this.Author = $RssItem.Author
-		$this.Title = $RssItem.Title
-	}
-
 	[string] ToString () {
 		$FeedTitleStr = if (${this}?.{RssFeed}?.Title) {"  (" + $this.RssFeed.Title + ")"} else {""}
 		return $this.Published.ToString("[yyyy-MM-dd] ") + $this.Title + $FeedTitleStr
@@ -40,44 +33,86 @@ class RSSItem {
 }
 
 
-function Get-RSSFeed {
+function _ReadRSSFeedSingle {
+	[CmdletBinding()]
+	param($Source, $Since, $IsInRunspace)
+
+	if ($IsInRunspace) {
+		$ErrorActionPreference = "Stop"
+		Set-StrictMode -Version Latest
+		$VerbosePreference = $using:VerbosePreference
+	}
+
+	$Stopwatch = [System.Diagnostics.Stopwatch]::new()
+	$Stopwatch.Start()
+
+	foreach ($i in Invoke-RestMethod -Uri $Source.Uri -Verbose:$false) {
+		$Title = try {
+			$t = if ($i.title.GetType() -eq [string]) {$i.title} else {$i.title.'#text'}
+			[System.Web.HttpUtility]::HtmlDecode($t)
+		} catch {$null}
+		$Link = try {
+			if ($i.{link}?.GetType() -eq [string]) {$i.link} else {$i.link.href}
+		} catch {$null}
+
+		$PublishedStr = try {$i.published} catch {$i.pubDate}
+		$Published = if ($PublishedStr) {
+			try {
+				Get-Date $PublishedStr
+			} catch {
+				# try removing the day of the week and parsing the rest, in case the parsing
+				#  failed due to mismatched day of the week and the rest of the date
+				$Parts = $PublishedStr -split ","
+				if ($Parts[0] -in @("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) {
+					Get-Date $Parts[1].Trim()
+				} else {$null}
+			}
+		} else {$null}
+
+		if ($null -eq $Since -or $Published -gt $Since) {
+			if ($IsInRunspace) {
+				# see comment in Read-RSSFeed in end {} block
+				@{RssFeed=$Source; Title=$Title; Uri=$Link; Published=$Published}
+			} else {
+				[RSSItem]::new($Source, $Title, $Link, $Published)
+			}
+		}
+	}
+
+	$Stopwatch.Stop()
+	Write-Verbose "Retrieving RSS feed for '$($Source.Title)' took '$($Stopwatch.Elapsed.TotalMilliseconds) ms'."
+}
+
+function Read-RSSFeed {
+	[CmdletBinding()]
 	param(
 			[Parameter(Mandatory, ValueFromPipeline)]
 			[RSSSource]
 		$Source,
 			[datetime]
-		$Since
+		$Since,
+			[switch]
+		$Parallel
 	)
 
+	begin {
+		if ($Parallel) {
+			$DownloadJobs = @()
+		}
+	}
+
 	process {
-		Invoke-RestMethod -Uri $Source.Uri | % {
-			$i = $_;
+		if ($Parallel) {
+			$DownloadJobs += Start-ThreadJob -ThrottleLimit 50 -ArgumentList @($Source, $Since, $true) -ScriptBlock $function:_ReadRSSFeedSingle
+		} else {
+			_ReadRSSFeedSingle $Source $Since $false -Verbose:$VerbosePreference
+		}
+	}
 
-			$Title = try {
-				$t = if ($_.title.GetType() -eq [string]) {$_.title} else {$_.title.'#text'}
-				[System.Web.HttpUtility]::HtmlDecode($t)
-			} catch {$null}
-			$Link = try {
-				if ($_.{link}?.GetType() -eq [string]) {$_.link} else {$_.link.href}
-			} catch {$null}
-
-			$PublishedStr = try {$_.published} catch {$i.pubDate}
-			$Published = if ($PublishedStr) {
-				try {
-					Get-Date $PublishedStr
-				} catch {
-					# try removing the day of the week and parsing the rest, in case the parsing
-					#  failed due to mismatched day of the week and the rest of the date
-					$Parts = $PublishedStr -split ","
-					if ($Parts[0] -in @("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) {
-						Get-Date $Parts[1].Trim()
-					} else {$null}
-				}
-			} else {$null}
-
-			if ($null -eq $Since -or $Published -gt $Since) {
-				[RSSItem]::new($Source, $Title, $Link, $Published)
-			}
+	end {
+		if ($Parallel) {
+			# creating RSSItem instance in another runspace has issues with runspace affinity, instead create it here
+			$DownloadJobs | Receive-Job -Wait -AutoRemoveJob | % {[RSSItem]::new($_.RssFeed, $_.Title, $_.Uri, $_.Published)}
 		}
 	}
 }
@@ -99,42 +134,6 @@ function Invoke-RSSItem {
 	}
 }
 
-function Invoke-RSS {
-		param(
-			[Parameter(Mandatory, ValueFromPipeline)]
-			[RSSSource]
-		$Source,
-			[DateTime]
-		$Since,
-			[switch]
-		$NoAutoSelect
-	)
-
-	begin {
-		$DownloadJobs = @()
-	}
-
-	process {
-		$DownloadJobs += Start-ThreadJob -ThrottleLimit 50 -ArgumentList $Source, $Since {
-			param($Source, $Since)
-			$Duration = Measure-Command {$Feed = Get-RSSFeed $Source -Since $Since}
-			$VerbosePreference = $using:VerbosePreference
-			Write-Verbose "Retrieving RSS feed for '$($Source.Title)' took '$($Duration.TotalMilliseconds) ms'."
-			# convert to string, transfering non-primitive types between runspaces seems to behave weirdly
-			return $Feed
-		}
-	}
-
-	end {
-		$DownloadJobs | Receive-Job -Wait -AutoRemoveJob
-			# clone, as referencing the RSSItem instance from another runspace throws weird errors
-			| % {[RSSItem]::new($_)} 
-			| sort
-			| Read-HostListChoice -Message "Select an article to open:" -NoAutoSelect:$NoAutoSelect
-			| Invoke-RSSItem
-	}
-}
-
 function Read-RSSFeedFile {
 	param(
 			[Parameter(ValueFromPipeline)]
@@ -151,14 +150,15 @@ function Read-RSSFeedFile {
 
 }
 
-
-function Show-RSSItem {
-	[Alias("rss")]
+function Read-RSSDefaultFeed {
 	[CmdletBinding()]
+	[Alias("rss-list")]
 	param($DaysSince = 14)
 
 	$Since = [DateTime]::Today.AddDays(-$DaysSince)
-	Read-RSSFeedFile | Invoke-RSS -Since $Since -NoAutoSelect -Verbose:$VerbosePreference
+	return Read-RSSFeedFile
+		| Read-RSSFeed -Parallel -Since $Since -Verbose:$VerbosePreference
+		| sort
 }
 
 function Edit-RSSDefaultFeedFile {
