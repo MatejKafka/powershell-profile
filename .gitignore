@@ -1,3 +1,7 @@
+# these are items that PowerShell automatically creates in its data directory
+/Help/
 /Modules/
+/Scripts/
+powershell.config.json
+
 /functions_custom.psm1
-/scripts/
