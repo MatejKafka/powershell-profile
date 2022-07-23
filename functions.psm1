@@ -46,7 +46,7 @@ function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	#& 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
 	# 2022, doesn't work from my pwsh config, uses an undefined variable
 	#& 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1'
-	
+
 	# replacement manual script
 	$VsWherePath = Join-Path ${env:ProgramFiles(x86)} "\Microsoft Visual Studio\Installer\vswhere.exe"
 	$VsPath = & $VsWherePath -products * -latest -property installationPath
@@ -105,43 +105,28 @@ function s {
 	Get-AltapSalamanderDirectory | select -First 1 | % FullName | Set-Location
 }
 
-class _CommandName : System.Management.Automation.IValidateSetValuesGenerator {
-    [String[]] GetValidValues() {
-        return Get-Command -Type Alias, Cmdlet, ExternalScript, "Function" | % Name
+# source: https://github.com/sethvs/sthArgumentCompleter/blob/master/sthArgumentCompleterFunctions.ps1
+function Get-ArgumentCompleter
+{
+    Param (
+		[switch]$Native,
+		[switch]$Custom
+    )
+
+	if (-not $Native -and -not $Custom) {
+		$Native = $true
+		$Custom = $true
+	}
+
+    $flags = [System.Reflection.BindingFlags]'Instance,NonPublic'
+    $_context = $ExecutionContext.GetType().GetField('_context',$flags).GetValue($ExecutionContext)
+
+    if ($Custom) {
+        $_context.GetType().GetProperty('CustomArgumentCompleters',$flags).GetValue($_context)
     }
-}
-
-function edit {
-	param(
-			[Parameter(Mandatory)]
-			[ValidateSet([_CommandName])]
-			[string]
-		$CommandName,
-			[switch]
-		$Gui
-	)
-
-	$Cmd = Get-Command $CommandName -Type Alias, Cmdlet, ExternalScript, "Function"
-	while ($Cmd.CommandType -eq "Alias") {
-		# resolve alias
-		$Cmd = $Cmd.ResolvedCommand
-	}
-
-	$EditorArgs = switch ($Cmd.CommandType) {
-		ExternalScript {$Cmd.Source}
-		"Function" {@($Cmd.ScriptBlock.File, $Cmd.ScriptBlock.StartPosition.StartLine)}
-		Cmdlet {
-			# we cannot edit cmdlet, it's a DLL; instead, open the module directory
-			explorer $Cmd.Module.ModuleBase
-			return
-		}
-	}
-
-	if ($EditorArgs) {
-		Open-TextFile @EditorArgs -Gui:$Gui
-	} else {
-		throw "Could not find path of the module containing the command '$CommandName'."
-	}
+	if ($Native) {
+        $_context.GetType().GetProperty('NativeArgumentCompleters',$flags).GetValue($_context)
+    }
 }
 
 function Resolve-VirtualPath {
