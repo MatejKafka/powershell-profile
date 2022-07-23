@@ -2,10 +2,14 @@ function Get-GithubRelease {
 	param(
 			<# Repository name, including org (e.g. "PowerShell/Powershell") #>
 			[Parameter(Mandatory)]
-			[ValidateScript({$_.Contains("/")})]
 			[string]
 		$RepositoryName
 	)
+	if ($RepositoryName -notlike "*/*") {
+		# if name doesn't have /, assume the Organization and repo name are the same
+		$RepositoryName = "$RepositoryName/$RepositoryName"
+	}
+
 	$Uri = "https://api.github.com/repos/$RepositoryName/releases"
 	Write-Verbose "Listing GitHub releases for '$RepositoryName'... (URL: $Uri)"
 	# -FollowRelLink automatically goes through all pages to get older releases

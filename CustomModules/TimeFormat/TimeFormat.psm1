@@ -1,4 +1,5 @@
 function Format-TimeSpan {
+	[CmdletBinding()]
 	param(
 			[Parameter(Mandatory)]
 			[TimeSpan]
@@ -12,13 +13,16 @@ function Format-TimeSpan {
 	} elseif ($TimeSpan.TotalSeconds -ge 10) {
 		$time = [math]::Round($TimeSpan.TotalSeconds, 1)
 		return "{0:N1} s" -f $time
-	} else {
+	} elseif ($TimeSpan -ne 0) {
 		$time = [math]::Round($TimeSpan.TotalMilliseconds, 2)
 		return "{0:N2} ms" -f $time
+	} else {
+		return "0 ms"
 	}
 }
 
 function Format-Age {
+	[CmdletBinding()]
 	param(
 			[Parameter(Mandatory)]
 			[datetime]
@@ -27,19 +31,14 @@ function Format-Age {
 		$ReferenceDate = (Get-Date)
 	)
 
-	$TimeSpan = $ReferenceDate - $When
-
-	if ($TimeSpan.TotalDays -ge 2) {
-		return $TimeSpan.ToString("%d") + " days, " + $TimeSpan.ToString("%h") + " hours"
-	} elseif ($TimeSpan.TotalDays -ge 1) {
-		return "1 day, " + $TimeSpan.ToString("%h") + " hours"
-	} elseif ($TimeSpan.TotalHours -ge 1) {
-		return $TimeSpan.ToString("%h") + " hours"
-	} elseif ($TimeSpan.TotalMinutes -ge 1) {
-		return $TimeSpan.ToString("%m") + " minutes"
-	} elseif ($TimeSpan.TotalSeconds -ge 10) {
-		return $TimeSpan.ToString("%s") + " seconds"
-	} else {
-		return "now"
+	switch ($ReferenceDate - $When) {
+		{$_.TotalDays -ge 2} {return $_.ToString("%d") + " days, " + $_.ToString("%h") + " hours"}
+		{$_.TotalDays -ge 1} {return "1 day, " + $_.ToString("%h") + " hours"}
+		{$_.TotalHours -ge 2} {return $_.ToString("%h") + " hours"}
+		{$_.TotalHours -ge 1} {return "1 hour"}
+		{$_.TotalMinutes -ge 2} {return $_.ToString("%m") + " minutes"}
+		{$_.TotalMinutes -ge 1} {return "1 minute"}
+		{$_.TotalSeconds -ge 5} {return $_.ToString("%s") + " seconds"}
+		default {return "now"}
 	}
 }

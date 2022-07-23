@@ -32,8 +32,7 @@ function .. {
 
 <# "mkdir and enter" #>
 function mke($Path) {
-	$null = mkdir $Path
-	cd $Path
+	cd -LiteralPath (mkdir $Path)
 }
 
 <# remove dir and cd .. #>
@@ -41,6 +40,10 @@ function rme {
 	$wd = Get-Location
 	cd ..
 	rm -Recurse -Force $wd
+}
+
+function gits {
+	git status @Args
 }
 
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
@@ -57,6 +60,13 @@ function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	}
 	Import-Module (Join-Path $VsPath "\Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
 	Enter-VsDevShell -Arch $Arch -HostArch amd64 -VsInstallPath $VsPath
+}
+
+function Get-GithubVersion([string[]]$Repo) {
+	foreach ($r in $Repo) {
+		Get-GithubRelease $r | select -First 1 | % tag_name
+			| % {if ($_ -like "v*") {$_.Substring(1)} else {$_}}
+	}
 }
 
 function todo ([string]$TodoText) {
