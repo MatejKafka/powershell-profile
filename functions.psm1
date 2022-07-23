@@ -1,29 +1,24 @@
 Set-StrictMode -Version Latest
 
 
-New-Alias ipy ipython
-New-Alias rms Remove-ItemSafely
+Set-Alias ipy ipython
+Set-Alias rms Remove-ItemSafely
 
 if ($IsWindows) {
 	# where is masked by builtin alias for Where-Object
-	New-Alias which where.exe
-	New-Alias py python.exe
+	Set-Alias which where.exe
+	Set-Alias py python.exe
 
-	New-Alias grep Select-String
-
-	if (Get-Command delta.exe) {
-		Remove-Alias diff -Force -ErrorAction Ignore
-		New-Alias diff delta.exe
-	}
+	Set-Alias grep Select-String
 }
 
 
-New-Alias / Invoke-Scratch
-New-Alias // Invoke-LastScratch
-New-Alias venv Activate-Venv
-New-Alias npp Invoke-Notepad
-New-Alias e Push-ExternalLocation
-New-Alias o Open-TextFile
+Set-Alias / Invoke-Scratch
+Set-Alias // Invoke-LastScratch
+Set-Alias venv Activate-Venv
+Set-Alias npp Invoke-Notepad
+Set-Alias e Push-ExternalLocation
+Set-Alias o Open-TextFile
 
 
 function .. {
