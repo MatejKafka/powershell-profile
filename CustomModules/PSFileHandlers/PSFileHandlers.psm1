@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 
-$script:ConfigPath = Get-PSDataPath "FileHandlers.psd1" `
+$script:ConfigPath = Get-PSDataPath "PSFileHandlers.psd1" `
 		-DefaultContentPath $PSScriptRoot\_DefaultConfig_DO_NOT_EDIT.psd1
 
 
