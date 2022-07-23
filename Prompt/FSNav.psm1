@@ -1,3 +1,8 @@
+param(
+		[ref]
+	$ReuseLastCommandStatus
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 Export-ModuleMember # don't export anything
@@ -12,6 +17,7 @@ $IGNORED_DIRECTORIES = @("`$RECYCLE.BIN", "System Volume Information")
 
 Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
 	cd ..
+	$script:ReuseLastCommandStatus.Value = $true
 	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
 }
 
@@ -34,7 +40,7 @@ function PrintItemList($baseCursor, $matching, $searchBuffer) {
 	$rui.CursorPosition = $baseCursor
 	$CurrentHeight = 0
 	$bufferLength = $searchBuffer.Length
-	
+
 	$s = "`n"
 
 	if ($null -eq $matching) {
@@ -58,7 +64,7 @@ function PrintItemList($baseCursor, $matching, $searchBuffer) {
 			return
 		}
 	}
-	
+
 	$s += (padding 0) * ($script:MaxListCount - $CurrentHeight + 1)
 	$Host.UI.Write($s.Substring(0, $s.Length - 1))
 }
@@ -67,7 +73,7 @@ function PrintCurrentInput($baseCursor, $buffer) {
 	$sc = $baseCursor
 	$sc.X -= 2
 	$rui.CursorPosition = $sc
-	
+
 	$Host.UI.Write("⸨ " + $buffer + (padding ($sc.X + 2 + $buffer.Length)))
 
 	$c = $baseCursor
@@ -96,12 +102,12 @@ function DeleteNext($buffer, $items) {
 	if (-not $items) {
 		return ""
 	}
-	
+
 	$origCount = @(GetMatching $buffer $items).Count
 	do {
 		$buffer = $buffer.Substring(0, $buffer.Length - 1)
 	} while (@(GetMatching $buffer $items).Count -eq $origCount)
-	
+
 	return $buffer
 }
 
@@ -136,13 +142,14 @@ $script:buffer = $null
 Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	$script:buffer = ""
 	$script:baseCursor = $rui.CursorPosition
-	
+
 	function Refresh {
 		$script:buffer = ""
+		$script:ReuseLastCommandStatus.Value = $true
 		[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
 		$script:baseCursor = $rui.CursorPosition
 	}
-	
+
 	# create space for list
 	$MaxLines = $script:MaxListCount + 1
 	$y = $script:baseCursor.Y + $MaxLines
@@ -150,44 +157,45 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		# create space for list
 		$Host.UI.Write("`n" * $MaxLines)
 		$script:baseCursor.Y = $rui.BufferSize.Height - $MaxLines - 1
+		$script:ReuseLastCommandStatus.Value = $true
 		# -1 for y to compensate multiline prompt
 		[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $script:baseCursor.Y - 1)
 	}
-	
+
 	while ($true) {
 		$dirs = GetAvailableItems
 		$matching = GetMatching $script:buffer $dirs
-	
+
 		if ($script:buffer -ne "") {
 			$script:buffer = CompleteNext $script:buffer $matching
 			$matching = GetMatching $script:buffer $dirs
 		}
-		
+
 		if ($script:buffer -in $matching -and @($matching).Count -eq 1) {
 			# we have single exact match
 			SelectItem $matching
 			Refresh
 			continue
 		}
-		
+
 		[Console]::CursorVisible = $false
 		PrintItemList $script:baseCursor $matching $script:buffer
 		PrintCurrentInput $script:baseCursor $script:buffer
 		[Console]::CursorVisible = $true
-	
+
 		$key = $rui.ReadKey("AllowCtrlC,IncludeKeyDown")
-		
+
 		# Escape or Ctrl-C
 		if ($key.VirtualKeyCode -eq 27 -or ($key.VirtualKeyCode -eq 67 -and $key.ControlKeyState -eq 8)) {
 			break
 		}
-		
+
 		# Backspace
 		if ($key.VirtualKeyCode -eq 8) {
 			$script:buffer = DeleteNext $script:buffer $dirs
 			continue
 		}
-		
+
 		# Enter
 		if ($key.VirtualKeyCode -eq 13) {
 			if ($script:buffer -in $matching) {
@@ -196,16 +204,16 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 				SelectItem ($matching -eq $script:buffer)[0]
 				Refresh
 				continue
-			}	
+			}
 		}
-		
+
 		# Up arrow
 		if ($key.VirtualKeyCode -eq 38) {
 			cd ..
 			Refresh
 			continue
 		}
-		
+
 		# Left arrow
 		if ($key.VirtualKeyCode -eq 37) {
 			cd C:
@@ -219,14 +227,14 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 			Refresh
 			continue
 		}
-		
+
 		# Down arrow
 		if ($key.VirtualKeyCode -eq 40) {
 			cd HKCU:
 			Refresh
 			continue
 		}
-		
+
 		if ($key.Character -ge 32 -and $key.Character -lt 127) {
 			# only complete if it matches some dir
 			if (@(GetMatching ($script:buffer + $key.Character) $dirs).Count -gt 0) {
@@ -234,13 +242,14 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 			}
 		}
 	}
-	
+
 	# clear the list entries
 	# it seems that writing whitespace-only is for some reason ignored, so we write '>', which gets overwritten by the refreshed prompt
 	$s = ">`n" + (padding 0) * $MaxLines
 	$Host.UI.Write($s.Substring(0, $s.Length - 1))
-	
+
 	[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory("cd '$(pwd)'")
+	$script:ReuseLastCommandStatus.Value = $true
 	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
 }
 

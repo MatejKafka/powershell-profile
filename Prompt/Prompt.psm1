@@ -5,11 +5,16 @@ param(
 )
 
 Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 Export-ModuleMember # don't export anything
+
+$script:ReuseLastCommandStatus = $false
+$script:LastStatusString = ""
 
 Import-Module $PSScriptRoot\Colors
 Import-Module $PSScriptRoot\PSReadLineOptions
-Import-Module $PSScriptRoot\FSNav
+Import-Module $PSScriptRoot\FSNav -ArgumentList ([ref]$script:ReuseLastCommandStatus)
+
 
 # written by our overriden version of Out-Default
 $script:_LastCmdOutputTypes = @()
@@ -23,25 +28,32 @@ $PSStyle.Progress.UseOSCIndicator = $true
 $script:FirstPromptTime = $null
 
 
-Function Write-HostLineEnd($message, $foregroundColor, $dy = 0) {
-	$origCursor = $Host.UI.RawUI.CursorPosition
-
-	if ($message.Length -gt $Host.UI.RawUI.WindowSize.Width) {
-		$message = $message.Substring(0, $Host.UI.RawUI.WindowSize.Width - 4) + " ..."
+function Get-StartupTimeStatus {
+	if ($script:FirstPromptTime -eq $null) {
+		$script:FirstPromptTime = Get-Date
+		$script:Times.rest = $script:FirstPromptTime
 	}
 
-	$targetCursor = $Host.UI.RawUI.CursorPosition
-	$targetCursor.X = $Host.UI.RawUI.WindowSize.Width - $message.Length
-	$targetCursor.Y += $dy
+	$LoadStartTime = (Get-Process -Id $pid).StartTime
+	$StartupTime = $script:FirstPromptTime - $LoadStartTime
+	$StartupTimeStr += "startup: " + (Format-TimeSpan $StartupTime)
 
-	$Host.UI.RawUI.CursorPosition = $targetCursor
-	Write-HostColor $message -NoNewLine -ForegroundColor $foregroundColor
+	$Sorted = ,@{Name = $null; Value = $LoadStartTime}
+	$Sorted += $script:Times.GetEnumerator() | Sort-Object -Property Value
+	$TimeStrings = @()
+	for ($i = 1; $i -lt $Sorted.Count; $i += 1) {
+		$_ = $Sorted[$i]
+		$TimeStrings += $_.Name + ": " + (Format-TimeSpan ($_.Value - $Sorted[$i - 1].Value))
+	}
 
-	$Host.UI.RawUI.CursorPosition = $origCursor
+	return $StartupTimeStr + " | " +  ($TimeStrings -join ", ")
 }
 
-Function Get-LastCommandStatus {
+function Get-LastCommandStatus {
 	param(
+			[Parameter(Mandatory)]
+			[Microsoft.PowerShell.Commands.HistoryInfo]
+		$LastCmd,
 			[Parameter(Mandatory)]
 			[boolean]
 		$ErrorOccurred,
@@ -57,54 +69,33 @@ Function Get-LastCommandStatus {
 	# status string indicating outcome of previous command
 	$StatusStr = ""
 
-	# print run time of last command, or startup time if this is the first time we're rendering prompt
-	$LastCmd = Get-History -Count 1
-	if ($null -ne $LastCmd) {
-		# render output type of previous command, unless it resulted in an error
-		if ($LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
-			if ($LastCmdOutputTypes.Length -gt 1) {
-				$StatusStr += "[" + $LastCmdOutputTypes.Length + "]"
-			}
-			$StatusStr += $LastCmdOutputTypes[0].ToString() + " | "
+	# render output type of previous command, unless it resulted in an error
+	if ($LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+		$FirstType = $LastCmdOutputTypes[0].ToString()
+		if ($FirstType -match "System\.(.*)") {
+			$FirstType = $Matches[1] # strip System.
 		}
-
-		# print exit code if error occurred
-		if ($ErrorOccurred) {
-			if ($LastExitCode -eq -1073741510 -or $LastCmd.ExecutionStatus -eq "Stopped") {
-				$StatusStr += "Ctrl-C | "
-			} elseif ($LastExitCode -eq 0) {
-				# error originates from powershell
-				$StatusStr += "Error | "
-			} else {
-				# error from external command
-				$StatusStr += [string]$LastExitCode + " | "
-			}
+		if ($LastCmdOutputTypes.Length -gt 1) {
+			$StatusStr += "[" + $LastCmdOutputTypes.Length + "]"
 		}
-
-		$ExecutionTime = $LastCmd.EndExecutionTime - $LastCmd.StartExecutionTime
-		$StatusStr += Format-TimeSpan $ExecutionTime
-	} else {
-		# we just started up, display startup time
-		if ($script:FirstPromptTime -eq $null) {
-			$script:FirstPromptTime = Get-Date
-			$script:Times.prompt = $script:FirstPromptTime
-		}
-
-		$LoadStartTime = (Get-Process -Id $pid).StartTime
-		$StartupTime = $script:FirstPromptTime - $LoadStartTime
-		$StatusStr += "startup: " + (Format-TimeSpan $StartupTime)
-
-		$Sorted = ,@{Name = $null; Value = $LoadStartTime}
-		$Sorted += $script:Times.GetEnumerator() | Sort-Object -Property Value
-		$TimeStrings = @()
-		for ($i = 1; $i -lt $Sorted.Count; $i += 1) {
-			$_ = $Sorted[$i]
-			$TimeStrings += $_.Name + ": " + (Format-TimeSpan ($_.Value - $Sorted[$i - 1].Value))
-		}
-
-		$StatusStr += " (" +  ($TimeStrings -join ", ") + ")"
+		$StatusStr += $FirstType + " | "
 	}
 
+	# print exit code if error occurred
+	if ($ErrorOccurred) {
+		if ($LastExitCode -eq -1073741510 -or $LastCmd.ExecutionStatus -eq "Stopped") {
+			$StatusStr += "Ctrl-C | "
+		} elseif ($LastExitCode -eq 0) {
+			# error originates from powershell
+			$StatusStr += "Error | "
+		} else {
+			# error from external command
+			$StatusStr += [string]$LastExitCode + " | "
+		}
+	}
+
+	$ExecutionTime = $LastCmd.EndExecutionTime - $LastCmd.StartExecutionTime
+	$StatusStr += Format-TimeSpan $ExecutionTime
 	return $StatusStr
 }
 
@@ -128,9 +119,14 @@ function Get-GitDirectory {
 	}
 }
 
-Function Write-ShellStatus($InfoColor) {
+function Write-ShellStatus($InfoColor) {
 	function Write-InfoStatus($Status) {
 		Write-HostColor "($Status)" -NoNewLine -ForegroundColor $InfoColor
+	}
+
+	# show if we're in debug mode; in 7.3.0-preview.2, this is currently broken due to scoping rules
+	if (Get-Variable PSDebugContext -ErrorAction Ignore) {
+		Write-InfoStatus "DBG"
 	}
 
 	# show if we're inside a MSVC Developer shell
@@ -164,34 +160,39 @@ Function Write-ShellStatus($InfoColor) {
 
 $script:LastCmdId = $null
 
-Function global:Prompt {
+function global:Prompt {
 	$ErrorOccurred = -not ($? -and ($global:LastExitCode -eq 0))
 
 	$Colors = $ErrorOccurred ? $UIColors.Prompt.Error : $UIColors.Prompt.Ok
 	$Color = $Colors.Base
 	$CwdColor = $Colors.Highlight
 
-	if ($Host.UI.RawUI.CursorPosition.Y -eq 0) {
-		# screen was cleared, create offset for our prompt
-		Write-HostColor ""
-	}
-
-
+	# render status string
 	$LastCmd = Get-History -Count 1
-	$StatusStr = if (($LastCmd -eq $null) -or ($LastCmd.Id -ne $script:LastCmdID)) {
-		if ($LastCmd -ne $null) {
-			$script:LastCmdId = $LastCmd.Id
-		}
+	$StatusStr = if ($LastCmd -eq $null) {
+		# render startup timings
+		Get-StartupTimeStatus
+	} elseif ($script:ReuseLastCommandStatus) {
+		$script:ReuseLastCommandStatus = $false
+		$script:LastStatusString
+	} elseif ($LastCmd.Id -ne $script:LastCmdID) {
+		$script:LastCmdId = $LastCmd.Id
 		# render previous command status
-		Get-LastCommandStatus $ErrorOccurred $global:LastExitCode $script:_LastCmdOutputTypes
+		Get-LastCommandStatus $LastCmd $ErrorOccurred $global:LastExitCode $script:_LastCmdOutputTypes
 	} else {
-		"" # should be empty, as sometimes we rerender prompt in same place, which should keep previous time
+		"" # either we're re-rendering prompt in the same place, or user pressed enter without entering a command
 	}
-	Write-HostLineEnd ($StatusStr + " ╠╗") $Color -dy -1
 
+	$script:LastStatusString = $StatusStr
 
-	# write horizontal separator
-	Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 2) + "╩") -ForegroundColor $Color
+	# write the horizontal separator and status string
+	if ($StatusStr) {
+		Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 4 - $StatusStr.Length) + "") -ForegroundColor $Color -NoNewLine
+		Write-HostColor $StatusStr -BackgroundColor $Color -ForegroundColor Black -NoNewLine
+		Write-HostColor "═" -ForegroundColor $Color
+	} else {
+		Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 1)) -ForegroundColor $Color
+	}
 	Write-HostColor "╚╣" -NoNewLine -ForegroundColor $Color
 	Write-ShellStatus $Color
 	Write-HostColor -NoNewLine " "
@@ -226,7 +227,7 @@ Function global:Prompt {
 
 
 <#
-	This override allows us to capture types of all output objects and display them in prompt.
+	This override allows us to capture the types of all output objects and display them in the prompt.
 
 	ISSUE: PowerShell internally sets $_ based on success of last command;
 		 this override contains some commands, so we'll lose the success status of previous
@@ -236,28 +237,27 @@ Function global:Prompt {
 #>
 function global:Out-Default {
 	param(
-		[switch]
+			[switch]
 		$Transcript,
-
-		[Parameter(ValueFromPipeline = $true)]
-		[PSObject]
+			[Parameter(ValueFromPipeline)]
+			[PSObject]
 		$InputObject
 	)
 
 	begin {
-		$scriptCmd = { & 'Microsoft.PowerShell.Core\Out-Default' @PSBoundParameters }
-		$steppablePipeline = $scriptCmd.GetSteppablePipeline($myInvocation.CommandOrigin)
-		$steppablePipeline.Begin($PSCmdlet)
+		$ScriptCmd = { & 'Microsoft.PowerShell.Core\Out-Default' @PSBoundParameters }
+		$SteppablePipeline = $scriptCmd.GetSteppablePipeline($myInvocation.CommandOrigin)
+		$SteppablePipeline.Begin($PSCmdlet)
 	}
 
 	process {
-		$steppablePipeline.Process($_)
+		$SteppablePipeline.Process($_)
 		if ($null -ne $_) {
 			$script:_LastCmdOutputTypes += $_.GetType()
 		}
 	}
 
 	end {
-		$steppablePipeline.End()
+		$SteppablePipeline.End()
 	}
 }
