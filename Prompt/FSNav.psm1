@@ -1,4 +1,6 @@
 Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+Export-ModuleMember # don't export anything
 
 Import-Module $PSScriptRoot\Colors
 
@@ -16,15 +18,10 @@ Set-PSReadLineKeyHandler -Key "Ctrl+UpArrow" -ScriptBlock {
 
 $rui = $Host.UI.RawUI
 
-function PadLine {
-	param($str, [switch]$NoNewLine, $ForegroundColor, $BackgroundColor)
-	
-	$cursorX = $rui.CursorPosition.X
-	$WHArgs = @{}
-	if ($ForegroundColor) {$WHArgs.ForegroundColor = $ForegroundColor}
-	if ($BackgroundColor) {$WHArgs.BackgroundColor = $BackgroundColor}
-	Write-Host $str -NoNewLine @WHArgs
-	Write-Host (" " * ($Host.UI.RawUI.WindowSize.Width - $str.Length - $cursorX)) -NoNewLine:$NoNewLine 
+New-Alias color Get-ColorEscapeSequence
+$Reset = $PSStyle.Reset
+function padding($TextLength) {
+	return " " * ($rui.WindowSize.Width - $TextLength) + "`n"
 }
 
 $script:MaxListCount = 20
@@ -38,28 +35,32 @@ function PrintItemList($baseCursor, $matching, $searchBuffer) {
 	$CurrentHeight = 0
 	$bufferLength = $searchBuffer.Length
 	
-	Write-Host ""
+	$s = "`n"
 
 	if ($null -eq $matching) {
-		Write-Host -NoNewLine -ForegroundColor $BaseColor (" ╚⸨ ")
-		PadLine "NO DIRECTORIES" -ForegroundColor $ErrorTextColor
+		$s += (color Foreground $BaseColor) + " ╚⸨ "
+		$s += (color Foreground $ErrorTextColor) + "NO DIRECTORIES" + $Reset
+		$s += padding 18
 		$CurrentHeight += 1
 	} else {
-		$matching | select -First $script:MaxListCount | % {
-			Write-Host -NoNewLine -ForegroundColor $BaseColor (" ╠⸨ ")
-			Write-Host -NoNewLine -BackgroundColor $BaseColor $_.Substring(0, $bufferLength)
-			PadLine $_.Substring($bufferLength) -ForegroundColor $TextColor
+		foreach ($_ in $matching | select -First $script:MaxListCount) {
+			$s += (color Foreground $BaseColor) + " ╠⸨ " + $Reset
+			$s += (color Background $BaseColor) + $_.Substring(0, $bufferLength) + $Reset
+			$s += (color Foreground $TextColor) + $_.Substring($bufferLength) + $Reset
+			$s += padding (4 + $_.Length)
 			$CurrentHeight += 1
 		}
 		if (@($matching).Count -gt $script:MaxListCount) {
-			PadLine -ForegroundColor $BaseColor (" ╚⸨ " + "... (+$($matching.Count - $script:MaxListCount))")
+			$countStr = " ╚⸨ ... (+$($matching.Count - $script:MaxListCount))"
+			$s += (color Foreground $BaseColor) + $countStr + $Reset
+			$s += padding $countStr.Length
+			$Host.UI.Write($s.Substring(0, $s.Length - 1))
 			return
 		}
 	}
 	
-	foreach ($i in $CurrentHeight..($script:MaxListCount)) {
-		PadLine ""
-	}	
+	$s += (padding 0) * ($script:MaxListCount - $CurrentHeight + 1)
+	$Host.UI.Write($s.Substring(0, $s.Length - 1))
 }
 
 function PrintCurrentInput($baseCursor, $buffer) {
@@ -67,7 +68,7 @@ function PrintCurrentInput($baseCursor, $buffer) {
 	$sc.X -= 2
 	$rui.CursorPosition = $sc
 	
-	PadLine -NoNewLine ("⸨ " + $buffer)
+	$Host.UI.Write("⸨ " + $buffer + (padding ($sc.X + 2 + $buffer.Length)))
 
 	$c = $baseCursor
 	$c.X += $buffer.Length
@@ -143,12 +144,11 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 	}
 	
 	# create space for list
-	$MaxLines = $script:MaxListCount + 2
+	$MaxLines = $script:MaxListCount + 1
 	$y = $script:baseCursor.Y + $MaxLines
 	if ($y -ge $rui.BufferSize.Height) {
-		foreach ($i in 1..$MaxLines) {
-			Write-Host ""
-		}
+		# create space for list
+		$Host.UI.Write("`n" * $MaxLines)
 		$script:baseCursor.Y = $rui.BufferSize.Height - $MaxLines - 1
 		# -1 for y to compensate multiline prompt
 		[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $script:baseCursor.Y - 1)
@@ -235,13 +235,10 @@ Set-PSReadLineKeyHandler -Key "Ctrl+d" -ScriptBlock {
 		}
 	}
 	
-	foreach ($i in 1..($script:MaxListCount + 2)) {
-		$x = $rui.CursorPosition
-		# weird hack, dunno why spaces don't work
-		PadLine ">" -NoNewLine
-		$rui.CursorPosition = $x
-		Write-Host " "
-	}
+	# clear the list entries
+	# it seems that writing whitespace-only is for some reason ignored, so we write '>', which gets overwritten by the refreshed prompt
+	$s = ">`n" + (padding 0) * $MaxLines
+	$Host.UI.Write($s.Substring(0, $s.Length - 1))
 	
 	[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory("cd '$(pwd)'")
 	[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
