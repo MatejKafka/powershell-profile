@@ -1,4 +1,4 @@
-#Requires -Version 7.2
+﻿#Requires -Version 7.2
 
 # read current time for startup measurement
 $_Times = @{
@@ -50,13 +50,27 @@ Import-Module -Global $PSScriptRoot\functions.psm1 -DisableNameChecking
 # custom private functions, not commited to git
 Import-Module -Global $PSScriptRoot\functions_custom.psm1 -ErrorAction Ignore -DisableNameChecking
 
+# delay the import of remaining modules after the profile is loaded to improve startup time
+Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
+	# delay the load of modules that take a long time to load, and are not immediately needed
+	# this is better than just directly importing the modules here, because once the OnIdle
+	#  callback is started, it cannot be iterrupted and the shell could be left unresponsive
+	#  for a long time until all modules are loaded
+	Import-Module DelayLoad 4>$null
+	
+	# setup ZLocation (my fork with some change)
+	# if user types `z` immediately after prompt loads, this will not be loaded yet,
+	#  so he'll have to wait for a bit, but the command will still work
+	Import-ModuleDelayed ZLocation
+	# completions for git, much faster than posh-git; ignore error, may not be installed
+	Import-ModuleDelayed PSGitCompletions -ErrorAction Ignore
+	# random argument completers
+	Import-ModuleDelayed ArgumentCompleters
+	Import-ModuleDelayed WSLTabCompletion -ErrorAction Ignore
+	Import-ModuleDelayed D:\_\hyperfine\app\autocomplete\_hyperfine.ps1 -ErrorAction Ignore
 }
 
 $_Times.imports = Get-Date
-
-
-# reload path from system env
-Update-EnvVar Path
 
 
 # do not setup custom prompt and banner if set
@@ -72,31 +86,3 @@ if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	$_Times.prompt = Get-Date
 }
 
-
-# delay the load of modules that take a long time to load, and are not immediately needed
-# OnIdle is triggered when user hasn't typed anything in 300ms and the input buffer is empty;
-# often, this is all loaded before the user starts typing the first command
-#
-# to not block for too long if the OnIdle event triggers just before user starts typing a command,
-#  the loading is split into multiple stages (apparently creating multiple event listeners on top
-#  level always fires them one after another, without checking if the engine is still idle between them)
-Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
-	if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
-		# setup ZLocation (my fork with some change)
-		# if user types `z` immediately after prompt loads, this will not be loaded yet,
-		#  so he'll have to wait for a bit, but the command will still work
-		Import-Module -Global ZLocation
-	}
-
-	Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
-		# native command arg completers
-		Import-Module -Global ArgumentCompleters
-
-		Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
-			# among others, completions for git
-			if (Get-Module posh-git -ListAvailable) {
-				Import-Module -Global posh-git
-			}
-		}
-	}
-}
