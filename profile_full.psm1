@@ -18,10 +18,10 @@ $global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 
 # add custom module directories
 $env:PSModulePath = @(
-	$env:PSModulePath,
-	(Resolve-Path $PSScriptRoot\CustomModules),
-	(Resolve-Path $PSScriptRoot\UnmaintainedModules)
-	(Resolve-Path $PSScriptRoot\ZLocation) # custom ZLocation fork
+	$env:PSModulePath
+	"$PSScriptRoot\CustomModules"
+	"$PSScriptRoot\UnmaintainedModules"
+	"$PSScriptRoot\ZLocation" # custom ZLocation fork
 ) -join [IO.Path]::PathSeparator
 
 
