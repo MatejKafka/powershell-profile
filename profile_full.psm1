@@ -67,7 +67,6 @@ Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
 	# random argument completers
 	Import-ModuleDelayed ArgumentCompleters
 	Import-ModuleDelayed WSLTabCompletion -ErrorAction Ignore
-	Import-ModuleDelayed D:\_\hyperfine\app\autocomplete\_hyperfine.ps1 -ErrorAction Ignore
 }
 
 $_Times.imports = Get-Date
