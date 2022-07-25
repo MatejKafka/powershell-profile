@@ -1,9 +1,7 @@
 # powershell-profile
-My heavily customized Powershell 7 profile directory. Primarily developed for Windows, but my colleague also uses it on Linux and it seems to work.
+My heavily customized Powershell 7 profile directory. Primarily developed for Windows, but my colleague also uses it on Linux and it seems to work. Currently requires at least `PowerShell v7.3.0-preview.2`.
 
-![Screenshot of pwsh.exe in dark mode](./screenshot-dark-mode.png)
-
-![Screenshot of pwsh.exe in light mode](./screenshot-light-mode.png)
+![Screenshot of pwsh.exe](./screenshot-dark-mode.png)
 
 ## Installation
 
@@ -16,8 +14,9 @@ git clone https://github.com/MatejKafka/powershell-profile $ConfigDir
 cd $ConfigDir
 git submodule update --init --recursive
 
-# if you want git autocompetion, also install posh-git
-Install-Module posh-git
+# if you want more autocompletions, also install these modules
+Install-Module PSGitCompletions
+Install-Module WSLTabCompletion
 ```
 
 ### Install to a custom directory
@@ -32,15 +31,16 @@ git submodule update --init --recursive
 # symlink the main profile from $PROFILE (default profile file path)
 New-Item -Type SymbolicLink $PROFILE -Target (Resolve-Path ./Microsoft.PowerShell_profile.ps1)
 
-# if you want git autocompetion, also install posh-git
-Install-Module posh-git
+# if you want more autocompletions, also install these modules
+Install-Module PSGitCompletions
+Install-Module WSLTabCompletion
 ```
 
 ## Setup (issues)
 
 ### Nothing loads?
 
-If you're not running in Windows Terminal, nothing will be loaded. I have it setup this way to make PowerShell load faster when invoked inside an IDE or from a script that does not specify the `-noprofile` PowerShell option. If you want to always load the profile, open `.\Microsoft.PowerShell_profile.ps1` in a text editor and remove the `if` condition around the last line, where `$PSScriptRoot\profile_full` is imported.
+If you're not running in Windows Terminal, nothing will be loaded. I have it setup this way to make PowerShell load faster when invoked inside an IDE or from a script that does not specify the `-noprofile` PowerShell option. If you want to always load the profile, open `.\Microsoft.PowerShell_profile.ps1` in a text editor and remove the `if` condition around the line where `$PSScriptRoot\profile_full` is imported.
 
 ### Some error is thrown from `Set-PSDataRoot` during startup?
 
@@ -67,11 +67,19 @@ Sorry, I spent quite a lot of time on optimizing it, but yeah, it's an order of 
 
 ## Module description
 
-### `./CustomModules`
+### `CustomModules/`
 
-Directory of custom modules, either made by me, or copied from the internet (source is noted in manifest file where applicable).
+Directory of custom modules, either written by me, or copied from the internet (source is noted in manifest file where applicable). For most of them, just read through the source (they're typically not large modules), few of the more interesting modules are described below:
 
-### `./UnmaintainedModules`
+- **PSLiveEdit** – edit any loaded function and immediately reload it by calling `edit <function-name>` (e.g. `edit prompt`)
+
+- **PSFileHandlers** – a module which allows you to configure your preferred browser and terminal/GUI text editor, used by other modules when they need to open a website or a text file (`Open-Url`, `Open-TextFile`)
+
+- **RSS** – basic RSS reader; configure your RSS feed list by calling `rss-edit`, then use `rss` or `rss-list` to find what's new and read the articles
+
+- **Write-HostColor** – Write-Host with full RGB colors in multiple formats
+
+### `UnmaintainedModules/`
 
 Modules which I once wrote (or copied), but I don't actively use them anymore, or they're under development and not working reasonably well yet. Some of them may work OK, other not so much.
 
@@ -96,6 +104,4 @@ Also adds `Ctrl+UpArrow`, equivalent to `cd ..`.
 
 ### `functions.psm1`
 
-Many random useful functions that I use, but are not large enough to warrant a separate module. Read through it, maybe you'll find something useful for you. 
-
-I'll highlight the `edit` function, which lets you edit any defined PowerShell function in a text editor by calling `edit <function-name>`. Also useful may be the `notes` function, which lets you add short notes that are shown at the top of each PowerShell session.
+Many random useful functions that I use, but are not large enough to warrant a separate module. Read through it, maybe you'll find something useful for you. I'll highlight the `notes` function, which lets you add short notes that are shown at the top of each PowerShell session.
