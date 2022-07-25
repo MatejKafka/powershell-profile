@@ -166,6 +166,7 @@ function global:Prompt {
 	$Colors = $ErrorOccurred ? $UIColors.Prompt.Error : $UIColors.Prompt.Ok
 	$Color = $Colors.Base
 	$CwdColor = $Colors.Highlight
+	$StatusColor = $Colors.Status
 
 	# render status string
 	$LastCmd = Get-History -Count 1
@@ -188,7 +189,7 @@ function global:Prompt {
 	# write the horizontal separator and status string
 	if ($StatusStr) {
 		Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 4 - $StatusStr.Length) + "") -ForegroundColor $Color -NoNewLine
-		Write-HostColor $StatusStr -BackgroundColor $Color -ForegroundColor Black -NoNewLine
+		Write-HostColor $StatusStr -BackgroundColor $Color -ForegroundColor $StatusColor -NoNewLine
 		Write-HostColor "═" -ForegroundColor $Color
 	} else {
 		Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 1)) -ForegroundColor $Color

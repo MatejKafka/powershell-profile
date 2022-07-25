@@ -7,10 +7,12 @@
 		Ok = @{
 			Base = "#666696"
 			Highlight = "#9999C9"
+			Status = "Black"
 		}
 		Error = @{
 			Base = "#906060"
 			Highlight = "#C99999"
+			Status = "Black"
 		}
 	}
 	# first line of the banner
