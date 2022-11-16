@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 
 New-Alias edit Edit-Command
 New-Alias editm Edit-Module
+New-Alias reloadm Update-LoadedModule
 
 
 <# NOTE: this cannot remove itself (this module). #>
@@ -39,6 +40,17 @@ class _ModuleName : System.Management.Automation.IValidateSetValuesGenerator {
     [String[]] GetValidValues() {
 		return Get-Module | % Name
     }
+}
+
+function Update-LoadedModule {
+	[CmdletBinding()]
+	param(
+			[Parameter(Mandatory)]
+			[ValidateSet([_ModuleName])]
+			[string]
+		$Name
+	)
+	_ReloadModule (Get-Module $Name)
 }
 
 function Edit-Module {
