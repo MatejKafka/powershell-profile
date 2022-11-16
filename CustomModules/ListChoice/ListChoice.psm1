@@ -5,51 +5,58 @@ function Read-HostListChoice {
 	[CmdletBinding()]
 	param(
 			[Parameter(Mandatory, ValueFromPipeline)]
-		$Choices,
+			[array]
+		$Item,
 			[string]
-		$Message = $null,
+		$Header = $null,
 			[string]
 		$Prompt = "Enter your choice",
 			[string]
 		$NoInputMessage = "No inputs provided, cannot choose.",
 			[switch]
-		$NoAutoSelect
+		$NoAutoSelect,
+			[scriptblock]
+		$FormatSb = {[string]$_}
 	)
 
-	if ($MyInvocation.ExpectingInput) {
-		# to get whole pipeline input as array
-		$Choices = @($input)
+	begin {
+		$i = 0
+		[array]$Options = @()
 	}
 
-	if (@($Choices).Count -eq 0) {
-		throw $NoInputMessage
-	}
-
-	if (-not [string]::IsNullOrEmpty($Message)) {
-		Write-Host $Message
-	}
-
-	$i = 0
-	$Choices | % {
-		Write-Host "    ($i) $_"
-		$i += 1
-	}
-
-	if ($i -eq 1 -and -not $NoAutoSelect) {
-		Write-Host "Automatically selected only possible option: '$Choices'."
-		return $Choices
-	}
-
-	while ($true) {
-		$ChoiceStr = Read-Host ($Prompt + " (0 - $($i-1))")
-		try {
-			$Choice = [int]::Parse($ChoiceStr)
-		} catch {
-			Write-Host "Input must be a number."
-			continue
+	process {
+		if ($i -eq 0 -and $Header) {
+			Write-Host $Header
 		}
-		if ($Choice -ge 0 -and $Choice -lt $i) {break}
-		Write-Host "Input not in range."
+
+		$Options += $Item
+		foreach ($ii in $Item) {
+			Write-Host "    ($i) $(% $FormatSb -InputObject $ii)"
+			$i += 1
+		}
 	}
-	return $Choices[$Choice]
+
+	end {
+		if ($i -eq 0) {
+			throw $NoInputMessage
+		}
+
+		if ($i -eq 1 -and -not $NoAutoSelect) {
+			Write-Host "Automatically selected only possible option: '$Options'."
+			return $Options
+		}
+
+		while ($true) {
+			$ChoiceStr = Read-Host ($Prompt + " (0 - $($i-1))")
+			try {
+				$UserChoice = [int]::Parse($ChoiceStr)
+			} catch {
+				Write-Host "Input must be a number."
+				continue
+			}
+			if ($UserChoice -ge 0 -and $UserChoice -lt $i) {break}
+			Write-Host "Input not in range."
+		}
+		return $Options[$UserChoice]
+	}
 }
