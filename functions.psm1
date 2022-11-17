@@ -3,6 +3,7 @@ Set-StrictMode -Version Latest
 
 Set-Alias ipy ipython
 Set-Alias rms Remove-ItemSafely
+Set-Alias man Get-ConciseHelp
 
 if ($IsWindows) {
 	# where is masked by builtin alias for Where-Object
@@ -40,6 +41,12 @@ function rme {
 function gits {
 	git status @Args
 }
+function gitd {
+	git diff @Args
+}
+function gitdc {
+	git diff --cached @Args
+}
 
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	# 2019
@@ -73,8 +80,16 @@ function todo ([string]$TodoText) {
 	}
 }
 
-function find($Pattern, $Path = ".", [switch]$CaseSensitive) {
-	ls -Recurse $Path | Select-String $Pattern -CaseSensitive:$CaseSensitive
+function find($Pattern, $Path = ".", $Context = 0, [switch]$CaseSensitive) {
+	ls -Recurse -File $Path | ? {$_.Target -eq $null}
+		| Select-String $Pattern -Context $Context -CaseSensitive:$CaseSensitive -ErrorAction Continue
+}
+
+function findo($Pattern, $Path = ".", $Context = 0, [switch]$CaseSensitive, [switch]$Gui) {
+	$Path = Resolve-Path $Path
+	find $Pattern $Path $Context -CaseSensitive:$CaseSensitive
+		| Read-HostListChoice -FormatSb {$_.ToEmphasizedString($Path)}
+		| % {o $_.Path $_.LineNumber -Gui:$Gui}
 }
 
 function Get-LatestEmail($HowMany, $ConfigFile) {
@@ -148,7 +163,7 @@ function Sleep-Computer {
 }
 
 class _CwdLnkShortcuts : System.Management.Automation.IValidateSetValuesGenerator {
-	[String[]] GetValidValues() {
+	[string[]] GetValidValues() {
 		return ls -File -Filter "./*.lnk" | Select-Object -ExpandProperty Name
 	}
 }
@@ -302,6 +317,65 @@ function Get-CmdExecutionTime($index=-1) {
 	$cmd = (Get-History)[$index]
 	$executionTime = $cmd.EndExecutionTime - $cmd.StartExecutionTime
 	return Format-TimeSpan $executionTime
+}
+
+function tmp($Extension, $Prefix = "") {
+	$Tmp = if ($IsWindows) {$env:TEMP} else {"/tmp"}
+    return Join-Path $Tmp "$Prefix$(New-Guid)$Extension"
+}
+
+
+# streams
+function drop {
+	<#
+		.SYNOPSIS
+		Drops items in pipeline until either `N` items are dropped, or an item satisfies the `Until` condition.
+	#>
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory, ValueFromPipeline)]
+		$InputObject,
+		[Parameter(Mandatory, Position = 0, ParameterSetName = "N")]
+		[int]
+		$N,
+		[Parameter(Mandatory, Position = 0, ParameterSetName = "Until")]
+		[scriptblock]
+		$Until,
+		[Parameter(Mandatory, ParameterSetName = "eq")]
+		[AllowNull()]
+		$eq,
+		[Parameter(Mandatory, ParameterSetName = "ne")]
+		[AllowNull()]
+		$ne
+	)
+
+	begin {
+		if ($MyInvocation.BoundParameters.ContainsKey("eq")) {
+			$Until = {$_ -eq $eq}
+		} elseif ($MyInvocation.BoundParameters.ContainsKey("ne")) {
+			$Until = {$_ -ne $ne}
+		}
+
+		$i = 0
+		if ($Until) {
+			$N = 1
+		}
+	}
+
+	process {
+		if ($i -ge $N) {
+			return $_
+		}
+
+		if (-not $Until) {
+			$i++
+		} else {
+			if ($Until.InvokeWithContext(@{}, [System.Collections.Generic.List[psvariable]][psvariable]::new('_', $_), @())) {
+				$N = 0
+				return $_
+			}
+		}
+	}
 }
 
 

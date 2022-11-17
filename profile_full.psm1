@@ -83,5 +83,10 @@ if (-not (Test-Path Env:PS_SIMPLE_PROMPT)) {
 	# setup prompt
 	Import-Module $PSScriptRoot\Prompt\Prompt -ArgumentList @($_Times)
 	$_Times.prompt = Get-Date
+} else {
+	# function to load the prompt manually, if needed
+	function full-prompt {
+		Import-Module $PSScriptRoot\Prompt\Prompt -ArgumentList @(@{})
+	}
 }
 
