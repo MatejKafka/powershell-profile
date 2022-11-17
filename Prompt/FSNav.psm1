@@ -114,10 +114,10 @@ function DeleteNext($buffer, $items) {
 function GetAvailableItems {
 	# some locations, like Registry don't have directories and Get-ChildItem reflects that in its params
 	$dirs = if ((Get-Command Get-ChildItem).Parameters.ContainsKey("Directory")) {
-		Get-ChildItem -Name -Force -Directory
-		ls -File -Filter "./*.lnk" | Select-Object -ExpandProperty Name
+		Get-ChildItem -Name -Force -Directory -ErrorAction Ignore
+		ls -File -Filter "./*.lnk" -ErrorAction Ignore | Select-Object -ExpandProperty Name
 	} else {
-		Get-ChildItem -Name -Force
+		Get-ChildItem -Name -Force -ErrorAction Ignore
 	}
 	return $dirs | where {$_ -notin $IGNORED_DIRECTORIES}
 }

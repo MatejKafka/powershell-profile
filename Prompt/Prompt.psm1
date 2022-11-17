@@ -28,7 +28,7 @@ $PSStyle.Progress.UseOSCIndicator = $true
 $script:FirstPromptTime = $null
 
 
-function Get-StartupTimeStatus {
+function Get-StartupTimeStatusString {
 	if ($script:FirstPromptTime -eq $null) {
 		$script:FirstPromptTime = Get-Date
 		$script:Times.rest = $script:FirstPromptTime
@@ -49,11 +49,11 @@ function Get-StartupTimeStatus {
 	return $StartupTimeStr + " | " +  ($TimeStrings -join ", ")
 }
 
-function Get-LastCommandStatus {
+function Get-CommandStatusString {
 	param(
 			[Parameter(Mandatory)]
 			[Microsoft.PowerShell.Commands.HistoryInfo]
-		$LastCmd,
+		$Cmd,
 			[Parameter(Mandatory)]
 			[boolean]
 		$ErrorOccurred,
@@ -63,38 +63,39 @@ function Get-LastCommandStatus {
 			[Parameter(Mandatory)]
 			[AllowEmptyCollection()]
 			[System.Type[]]
-		$LastCmdOutputTypes
+		$CmdOutputTypes
 	)
 
-	# status string indicating outcome of previous command
+	# status string indicating outcome of the command command
 	$StatusStr = ""
 
-	# render output type of previous command, unless it resulted in an error
-	if ($LastCmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
-		$FirstType = $LastCmdOutputTypes[0].ToString()
-		if ($FirstType -match "System\.(.*)") {
-			$FirstType = $Matches[1] # strip System.
-		}
-		if ($LastCmdOutputTypes.Length -gt 1) {
-			$StatusStr += "[" + $LastCmdOutputTypes.Length + "]"
+	# render output type of the command, unless it resulted in an error
+	if ($CmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+		$FirstType = Get-ConciseTypeName $CmdOutputTypes[0].FullName -StripSystem
+		if ($CmdOutputTypes.Length -gt 1) {
+			$StatusStr += "[" + $CmdOutputTypes.Length + "]"
 		}
 		$StatusStr += $FirstType + " | "
 	}
 
 	# print exit code if error occurred
 	if ($ErrorOccurred) {
-		if ($LastExitCode -eq -1073741510 -or $LastCmd.ExecutionStatus -eq "Stopped") {
+		if ($LastExitCode -eq -1073741510 -or $Cmd.ExecutionStatus -eq "Stopped") {
 			$StatusStr += "Ctrl-C | "
 		} elseif ($LastExitCode -eq 0) {
 			# error originates from powershell
 			$StatusStr += "Error | "
 		} else {
 			# error from external command
-			$StatusStr += [string]$LastExitCode + " | "
+			$StatusStr += if ($LastExitCode -lt 0) {
+				"0x{0:X} ({0}) | " -f $LastExitCode
+			} else {
+				[string]$LastExitCode + " | "
+			}
 		}
 	}
 
-	$ExecutionTime = $LastCmd.EndExecutionTime - $LastCmd.StartExecutionTime
+	$ExecutionTime = $Cmd.EndExecutionTime - $Cmd.StartExecutionTime
 	$StatusStr += Format-TimeSpan $ExecutionTime
 	return $StatusStr
 }
@@ -170,16 +171,16 @@ function global:Prompt {
 
 	# render status string
 	$LastCmd = Get-History -Count 1
-	$StatusStr = if ($LastCmd -eq $null) {
-		# render startup timings
-		Get-StartupTimeStatus
-	} elseif ($script:ReuseLastCommandStatus) {
+	$StatusStr = if ($script:ReuseLastCommandStatus) {
 		$script:ReuseLastCommandStatus = $false
 		$script:LastStatusString
+	} elseif ($LastCmd -eq $null) {
+		# render startup timings
+		Get-StartupTimeStatusString
 	} elseif ($LastCmd.Id -ne $script:LastCmdID) {
 		$script:LastCmdId = $LastCmd.Id
 		# render previous command status
-		Get-LastCommandStatus $LastCmd $ErrorOccurred $global:LastExitCode $script:_LastCmdOutputTypes
+		Get-CommandStatusString $LastCmd $ErrorOccurred $global:LastExitCode $script:_LastCmdOutputTypes
 	} else {
 		"" # either we're re-rendering prompt in the same place, or user pressed enter without entering a command
 	}
@@ -188,7 +189,11 @@ function global:Prompt {
 
 	# write the horizontal separator and status string
 	if ($StatusStr) {
-		Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 4 - $StatusStr.Length) + "") -ForegroundColor $Color -NoNewLine
+		$MaxStatusLength = $Host.UI.RawUI.WindowSize.Width - 4
+		if ($StatusStr.Length -gt $MaxStatusLength) {
+			$StatusStr = $StatusStr.Substring(0, $MaxStatusLength - 1) + "…"
+		}
+		Write-HostColor ("╦" + "═" * ($MaxStatusLength - $StatusStr.Length) + "") -ForegroundColor $Color -NoNewLine
 		Write-HostColor $StatusStr -BackgroundColor $Color -ForegroundColor $StatusColor -NoNewLine
 		Write-HostColor "═" -ForegroundColor $Color
 	} else {
@@ -199,6 +204,10 @@ function global:Prompt {
 	Write-HostColor -NoNewLine " "
 
 	$CwdString = [string](Get-Location)
+	# registry provider paths are too long, remove the prefix
+	if ($CwdString -match '^Microsoft\.PowerShell\.Core\\Registry\:\:(.*)$') {
+		$CwdString = $Matches[1]
+	}
 	
 	# write the prompt itself
 	Write-HostColor $CwdString -NoNewLine -ForegroundColor $CwdColor
@@ -208,10 +217,11 @@ function global:Prompt {
 
 
 	# set tab/window title to the shortened version of CWD (my Windows Terminal tab title fits roughly 25 chars (it's non-monospace))
-	$Host.UI.RawUI.WindowTitle = if ($CwdString.Length -le 25) {
+	$MAX_TAB_TITLE_LENGTH = 25
+	$Host.UI.RawUI.WindowTitle = if ($CwdString.Length -le $MAX_TAB_TITLE_LENGTH) {
 		$CwdString
 	} else {
-		$Trimmed = $CwdString.Substring($CwdString.Length - 25)
+		$Trimmed = $CwdString.Substring($CwdString.Length - $MAX_TAB_TITLE_LENGTH)
 		$SlashI = $Trimmed.IndexOfAny("\/")
 		"…" + $(if ($SlashI -ge 0) {$Trimmed.Substring($SlashI)} else {$Trimmed})
 	}
