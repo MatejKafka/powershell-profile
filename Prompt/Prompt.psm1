@@ -20,6 +20,8 @@ Import-Module $PSScriptRoot\FSNav -ArgumentList ([ref]$script:ReuseLastCommandSt
 $script:_LastCmdOutputTypes = @()
 # without setting this, drawing prompt would fail
 $global:LastExitCode = 0
+# LastExitCode is overwritten on each prompt; LastExitCode of the previous entered command is stored here
+$global:PreviousCommandExitCode = 0
 # otherwise python venv would break our fancy Prompt
 $Env:VIRTUAL_ENV_DISABLE_PROMPT = $true
 # this shows a progress bar on taskbar and in terminal tab icon in Windows Terminal
@@ -161,33 +163,41 @@ function Write-ShellStatus($InfoColor) {
 
 $script:LastCmdId = $null
 
-function global:Prompt {
-	$ErrorOccurred = -not ($? -and ($global:LastExitCode -eq 0))
-
-	$Colors = $ErrorOccurred ? $UIColors.Prompt.Error : $UIColors.Prompt.Ok
-	$Color = $Colors.Base
-	$CwdColor = $Colors.Highlight
-	$StatusColor = $Colors.Status
-
-	# render status string
+function BuildStatusStr($ErrorOccurred, $ExitCode, $LastCmdOutputTypes) {
 	$LastCmd = Get-History -Count 1
-	$StatusStr = if ($script:ReuseLastCommandStatus) {
+	
+	if ($script:ReuseLastCommandStatus) {
 		$script:ReuseLastCommandStatus = $false
-		$script:LastStatusString
-	} elseif ($LastCmd -eq $null) {
+		$StatusStr = $script:LastStatusString
+		# VT mark: end of command
+		$VTMarkStr = "`e]133;D`a"
+
+	} elseif ($null -eq $LastCmd) {
 		# render startup timings
-		Get-StartupTimeStatusString
+		$StatusStr = Get-StartupTimeStatusString
+		$VTMarkStr = ""
+
 	} elseif ($LastCmd.Id -ne $script:LastCmdID) {
 		$script:LastCmdId = $LastCmd.Id
 		# render previous command status
-		Get-CommandStatusString $LastCmd $ErrorOccurred $global:LastExitCode $script:_LastCmdOutputTypes
+		$StatusStr = Get-CommandStatusString $LastCmd $ErrorOccurred $ExitCode $LastCmdOutputTypes
+
+		# VT mark: end of command, with exit code
+		$VTMarkExitCode = $ExitCode -ne 0 ? $ExitCode : $ErrorOccurred ? 1 : 0
+		$VTMarkStr = "`e]133;D;${VTMarkExitCode}`a"
+	
 	} else {
-		"" # either we're re-rendering prompt in the same place, or user pressed enter without entering a command
+		# either we're re-rendering prompt in the same place, or user pressed enter without entering a command
+		$StatusStr = ""
+		# VT mark: end of command
+		$VTMarkStr = "`e]133;D`a"
 	}
 
 	$script:LastStatusString = $StatusStr
+	return $StatusStr, $VTMarkStr
+}
 
-	# write the horizontal separator and status string
+function PrintSeparatorAndStatus($StatusStr, $Color, $StatusColor) {
 	if ($StatusStr) {
 		$MaxStatusLength = $Host.UI.RawUI.WindowSize.Width - 4
 		if ($StatusStr.Length -gt $MaxStatusLength) {
@@ -200,21 +210,43 @@ function global:Prompt {
 		Write-HostColor ("╦" + "═" * ($Host.UI.RawUI.WindowSize.Width - 1)) -ForegroundColor $Color
 	}
 	Write-HostColor "╚╣" -NoNewLine -ForegroundColor $Color
+}
+
+function global:Prompt {
+	$ErrorOccurred = -not ($? -and ($global:LastExitCode -eq 0))
+	$ExitCode = $global:LastExitCode
+
+	$Colors = $ErrorOccurred ? $UIColors.Prompt.Error : $UIColors.Prompt.Ok
+	$Color = $Colors.Base
+	$CwdColor = $Colors.Highlight
+	$StatusColor = $Colors.Status
+
+	# render status string
+	$StatusStr, $VTMarkStr = BuildStatusStr $ErrorOccurred $ExitCode $script:_LastCmdOutputTypes
+	$CwdString = $ExecutionContext.SessionState.Path.CurrentLocation.ProviderPath
+
+	# VT mark: prompt started
+	$VTMarkStr += "`e]133;A$([char]07)"
+	# VT mark: CWD
+	$VTMarkStr += "`e]9;9;`"${CwdString}`"$([char]07)"
+
+	# write the VT mark string first (command ended, prompt started)
+	Write-Host -NoNewLine $VTMarkStr
+
+	# write the horizontal separator and status string
+	PrintSeparatorAndStatus $StatusStr $Color $StatusColor
 	Write-ShellStatus $Color
 	Write-HostColor -NoNewLine " "
 
-	$CwdString = [string](Get-Location)
-	# registry provider paths are too long, remove the prefix
-	if ($CwdString -match '^Microsoft\.PowerShell\.Core\\Registry\:\:(.*)$') {
-		$CwdString = $Matches[1]
-	}
-	
 	# write the prompt itself
 	Write-HostColor $CwdString -NoNewLine -ForegroundColor $CwdColor
 
+	# VT mark: prompt ended, command started
+	Write-Host -NoNewLine "`e]133;B$([char]07)"
+
+
 	# set indent of continuation prompt to match the main prompt (so that multiline code in the prompt has no jumps between lines)
 	Set-PSReadLineOption -ContinuationPrompt (" " * [math]::max(0, $Host.UI.RawUI.CursorPosition.X - 1) + ">> ")
-
 
 	# set tab/window title to the shortened version of CWD (my Windows Terminal tab title fits roughly 25 chars (it's non-monospace))
 	$MAX_TAB_TITLE_LENGTH = 25
@@ -228,6 +260,7 @@ function global:Prompt {
 
 	
 	# reset exit code
+	$global:PreviousCommandExitCode = $global:LastExitCode
 	$global:LastExitCode = 0
 	# reset last output types and move them to the user-accessible $global:Types variable
 	$global:Types = $script:_LastCmdOutputTypes
