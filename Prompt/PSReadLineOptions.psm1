@@ -41,8 +41,7 @@ Set-PSReadLineKeyHandler -Key "Tab" -ScriptBlock {
 }
 
 
-Set-PSReadLineKeyHandler -Key End `
-                         -ScriptBlock {
+Set-PSReadLineKeyHandler -Key "End" -ScriptBlock {
     param($key, $arg)
 
     $line = $null

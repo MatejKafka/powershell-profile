@@ -8,13 +8,11 @@ $_Times = @{
 Set-StrictMode -Version Latest
 # stop even on non-critical errors
 $global:ErrorActionPreference = "Stop"
+$global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # throw error when native command returns non-zero exit code
 $global:PSNativeCommandUseErrorActionPreference = $true
 # show Information log stream
 $global:InformationPreference = "Continue"
-$global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
-# this shouldn't be necessary anymore
-#$PSDefaultParameterValues["*:Encoding"] = "utf8"
 
 # add custom module directories
 $env:PSModulePath = @(
@@ -31,7 +29,8 @@ Set-PSDataRoot $PSScriptRoot\..\data
 
 if ($IsWindows) {
 	# create a new aliased drive for HKCR
-	$null = New-PSDrive -Scope Global -PSProvider Registry -Root HKEY_CLASSES_ROOT -Name HKCR
+	# ignore errors in case we're reloading the script and the drive already exists
+	$null = New-PSDrive -Scope Global -PSProvider Registry -Root HKEY_CLASSES_ROOT -Name HKCR -ErrorAction Ignore
 }
 
 # set path where command history is saved
@@ -47,6 +46,8 @@ $_Times.setup = Get-Date
 # a collection of random useful functions; -Global is used so that the module is visible externally
 #  (among other benefits, this means that it can be reloaded separately)
 Import-Module -Global $PSScriptRoot\functions.psm1 -DisableNameChecking
+# stub completers which lazily load the actual completer on first invocation to minimize startup impact
+Import-Module -Global $PSScriptRoot\functions_completers.psm1
 # custom private functions, not commited to git
 Import-Module -Global $PSScriptRoot\functions_custom.psm1 -ErrorAction Ignore -DisableNameChecking
 
@@ -62,11 +63,9 @@ Register-EngineEvent PowerShell.OnIdle -MaxTriggerCount 1 -Action {
 	# if user types `z` immediately after prompt loads, this will not be loaded yet,
 	#  so he'll have to wait for a bit, but the command will still work
 	Import-ModuleDelayed ZLocation
-	# completions for git, much faster than posh-git; ignore error, may not be installed
-	Import-ModuleDelayed PSGitCompletions -ErrorAction Ignore
-	# random argument completers
+	
+	# random argument completers, too many to list in functions_completers.psm1
 	Import-ModuleDelayed ArgumentCompleters
-	Import-ModuleDelayed WSLTabCompletion -ErrorAction Ignore
 }
 
 $_Times.imports = Get-Date

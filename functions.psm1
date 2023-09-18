@@ -38,6 +38,14 @@ function rme {
 	rm -Recurse -Force $wd
 }
 
+function rmf {
+	rm -Recurse -Force @Args
+}
+
+function touch {
+	(gi @Args).LastWriteTime = Get-Date
+}
+
 function gits {
 	git status @Args
 }
@@ -46,6 +54,9 @@ function gitd {
 }
 function gitdc {
 	git diff --cached @Args
+}
+function gitl {
+	git log @Args
 }
 
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
@@ -56,7 +67,7 @@ function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 
 	# replacement manual script
 	$VsWherePath = Join-Path ${env:ProgramFiles(x86)} "\Microsoft Visual Studio\Installer\vswhere.exe"
-	$VsPath = & $VsWherePath -products * -latest -property installationPath
+	$VsPath = & $VsWherePath -products Microsoft.VisualStudio.Product.BuildTools -latest -property installationPath
 	if ($null -eq $VsPath) {
 		throw "'vswhere.exe' could not find any MSVC installation."
 	}
@@ -71,7 +82,7 @@ function Get-GithubVersion([string[]]$Repo) {
 	}
 }
 
-function todo ([string]$TodoText) {
+function todo([string]$TodoText) {
 	if ([string]::IsNullOrEmpty($TodoText)) {
 		Write-HostColor "TODO:" -ForegroundColor "#909060"
 		Get-Todo | % {" $_"} | Write-HostColor -ForegroundColor "#909060"
@@ -103,6 +114,18 @@ function Get-LatestEmail($HowMany, $ConfigFile) {
 			Sender = $_.From.Name ?? $_.From.Address
 			Subject = $_.Subject
 		}}
+}
+
+function pinvoke([string]$Signature, $Dll = "kernel32.dll") {
+	Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static partial class Win32 {
+    [DllImport("$Dll")]
+    public static extern $Signature;
+}
+"@
 }
 
 
@@ -214,8 +237,14 @@ function ssh-config {
 }
 
 
-function oris {
-	Get-OrisEnrolledEvents | Format-OrisEnrolledEvents
+function Expand-Msi([Parameter(Mandatory)]$MsiPath, [Parameter(Mandatory)]$OutputPath) {
+    $MsiPath = Resolve-Path $MsiPath
+    $OutputPath = Resolve-VirtualPath $OutputPath
+
+    # /qn = no GUI
+    # TARGETDIR = where to extract
+    Start-Process -Wait msiexec -ArgumentList /a, $MsiPath, /qn, TARGETDIR=$OutputPath
+    return Get-Item $OutputPath
 }
 
 function BulkRename() {
@@ -302,17 +331,6 @@ function Update-EnvVar {
 }
 
 
-function Update-PowerShell([switch]$Stable) {
-	$InstallerScript = Invoke-RestMethod https://aka.ms/install-powershell.ps1
-	$Installer = [ScriptBlock]::Create($InstallerScript)
-	if ($Stable) {
-		& $Installer -UseMSI
-	} else {
-		& $Installer -UseMSI -Preview
-	}
-}
-
-
 function Get-CmdExecutionTime($index=-1) {
 	$cmd = (Get-History)[$index]
 	$executionTime = $cmd.EndExecutionTime - $cmd.StartExecutionTime
@@ -322,6 +340,18 @@ function Get-CmdExecutionTime($index=-1) {
 function tmp($Extension, $Prefix = "") {
 	$Tmp = if ($IsWindows) {$env:TEMP} else {"/tmp"}
     return Join-Path $Tmp "$Prefix$(New-Guid)$Extension"
+}
+
+<# Convert the passed number to hex. #>
+function hex([Parameter(Mandatory)]$n) {
+	if ($n -is [string]) {
+		$ln = [long]$n
+		if ($ln -gt [int32]::MaxValue -or $ln -lt [int32]::MinValue) {
+			return "0x{0:X}" -f $ln
+		}
+		$n = [int32]$n
+	}
+	return "0x{0:X}" -f $n
 }
 
 

@@ -46,16 +46,16 @@ function Get-PSDataPath {
 		if (Test-Path -Type Leaf $Path) {
 			return Get-Item $Path
 		} elseif ($DefaultContentPath) {
-			Copy-Item $DefaultContentPath $Path
-			return Get-Item $Path
+			New-Item -Type Directory -Force (Split-Path $Path)
+			return Copy-Item $DefaultContentPath $Path -PassThru
 		}
 		return New-Item $Path
 	} else {
 		if (Test-Path -Type Container $Path) {
 			return Get-Item $Path
 		} elseif ($DefaultContentPath) {
-			Copy-Item -Recurse $DefaultContentPath $Path
-			return Get-Item $Path
+			New-Item -Type Directory -Force (Split-Path $Path)
+			return Copy-Item -Recurse $DefaultContentPath $Path -PassThru
 		}
 		return New-Item -Type Directory $Path
 	}

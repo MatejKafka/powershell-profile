@@ -10,7 +10,7 @@ function Invoke-WithEnvironment {
 	foreach ($Arg in $Args) {
 		if ($ParsingEnv) {
 			# FIXME: is this pattern ok?
-			if ($Arg -match '(^[^ ]+)=(.*)$') {
+			if ($Arg -match '(^[^ ^=]+)=(.*)$') {
 				$NewEnv[$Matches[1]] = $Matches[2]
 			} else {
 				$ParsingEnv = $false
