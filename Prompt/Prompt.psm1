@@ -73,7 +73,7 @@ function Get-CommandStatusString {
 
 	# render output type of the command, unless it resulted in an error
 	if ($CmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
-		$FirstType = Get-ConciseTypeName $CmdOutputTypes[0].FullName -StripSystem
+		$FirstType = Get-ConciseTypeName $CmdOutputTypes[0] -StripSystem
 		if ($CmdOutputTypes.Length -gt 1) {
 			$StatusStr += "[" + $CmdOutputTypes.Length + "]"
 		}
@@ -150,7 +150,7 @@ function Write-ShellStatus($InfoColor) {
 			$GitStr = try {
 				$RefStr = cat (Join-Path $GitDir "./HEAD")
 				# "ref: refs/heads/".Length
-				$BranchName = $RefStr.Substring(16)
+				$BranchName = if ($RefStr -like "ref: refs/heads/*") {$RefStr.Substring(16)} else {$RefStr}
 				"git:" + $BranchName
 			} catch {"git"}
 			Write-InfoStatus $GitStr
