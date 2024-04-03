@@ -7,12 +7,12 @@ if ($null -eq $OpenedFilesViewCmd) {
 
 
 class ProcessLocks {
-	[System.Management.Automation.PathInfo]$ProcessPath
+	[string]$ProcessPath
 	[string[]]$PIDs
 	[string[]]$Files
 
 	ProcessLocks($ProcessPath, $PIDs, $Files) {
-		$this.ProcessPath = Resolve-Path $ProcessPath
+		$this.ProcessPath = $ProcessPath
 		$this.PIDs = $PIDs
 		$this.Files = $Files
 	}
@@ -22,31 +22,10 @@ class ProcessLocks {
 		$out += "Files locked by '$($this.ProcessPath)' (PID$(if (@($this.PIDs).Count -gt 1) {"s"}): $($this.PIDs -join ", ")):"
 		$out += $this.Files | select -First 5 | % {"    $_"}
 		if (@($this.Files).Count -gt 5) {
-			$out += "   ... ($($this.Files.Count) more)"
+			$out += "   ... ($($this.Files.Count - 5) move)"
 		}
 		return ($out -join "`n") + "`n"
 	}
-}
-
-
-<# Checks if any file in the passed directory is locked by a process (has an open handle without allowed sharing). #>
-function CheckForLockedFiles($DirPath) {
-	foreach ($file in Get-ChildItem -Recurse -File $DirPath) {
-		# try to open each file for writing; if it fails with HRESULT == 0x80070020,
-		#  we know another process holds a lock over the file
-		try {
-			# TODO: use the low-level version which returns handle, we don't need the C# file stream, and this is a very hot loop
-			[System.IO.File]::Open($file, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write).Close()
-		} catch {
-			$InnerException = $_.Exception.InnerException
-			if ($null -ne $InnerException -and $InnerException.HResult -eq 0x80070020) {
-				return $true # another process is holding a lock
-			} else {
-				throw # another error
-			}
-		}
-	}
-	return $false
 }
 
 <# Lists processes that have a lock (an open handle without allowed sharing) on a file under $DirPath. #>
@@ -56,8 +35,13 @@ function ListProcessesLockingFiles($DirPath) {
 	$Procs = [Xml]::new()
 	try {
 		# arguments with spaces must be manually quoted
-		$OFVProc = Start-Process -FilePath $OpenedFilesViewCmd -Wait -NoNewWindow -PassThru `
+		$OFVProc = Start-Process -FilePath $OpenedFilesViewCmd -NoNewWindow -PassThru `
 				-ArgumentList /sxml, "`"$OutFile`"", /nosort, /filefilter, "`"$(Resolve-Path $DirPath)`""
+		
+		# workaround from https://stackoverflow.com/a/23797762
+		$null = $OFVProc.Handle
+		$OFVProc.WaitForExit()
+
 		if ($OFVProc.ExitCode -ne 0) {
 			throw "Could not list processes locking files in '$DirPath' (OpenedFilesView returned exit code '$($Proc.ExitCode)')."
 		}
@@ -68,11 +52,12 @@ function ListProcessesLockingFiles($DirPath) {
 		rm $OutFile -ErrorAction Ignore
 	}
 	return $Procs.opened_files_list.item | Group-Object process_path | % {[ProcessLocks]::new(
-			$_.Name, ($_.Group.process_id | select -Unique | sort), $_.Group.full_path)}
+			$_.Name, ($_.Group.process_id | select -Unique | sort), ($_.Group.full_path | select -Unique))}
 }
 
-function Get-LockedFiles {
+function Get-LockedFile {
 	[CmdletBinding()]
+	[OutputType([ProcessLocks])]
 	param(
 			[Parameter(Mandatory)]
 			[string]
@@ -80,20 +65,25 @@ function Get-LockedFiles {
 		$DirectoryPath
 	)
 
-	if (-not (CheckForLockedFiles $DirectoryPath)) {
-		# no locked files
+	# there are some locked files, find out which and report to the user
+	$LockingProcs = ListProcessesLockingFiles $DirectoryPath
+	if (@($LockingProcs).Count -eq 0) {
 		Write-Information "No locked files found."
 		return
 	}
 
-	# there are some locked files, find out which and report to the user
-	$LockingProcs = ListProcessesLockingFiles $DirectoryPath
-	if (@($LockingProcs).Count -eq 0) {
-		# some process is locking files in the directory, but we don't which one
-		# I don't see why this should happen (unless some process exits between the two checks, or there's an error in OFV),
-		# so this is here just in case
-		throw "Some unknown process is locking files inside the directory '$DirectoryPath', but OpenedFilesView did not return any processes."
-	}
+	return $LockingProcs
+}
 
-	return $LockingProcs | % ToString
+function Show-LockedFile {
+	[CmdletBinding()]
+	[OutputType([string])]
+	param(
+			[Parameter(Mandatory)]
+			[string]
+			[ValidateScript({Test-Path -Type Container $_})]
+		$DirectoryPath
+	)
+
+	Get-LockedFiles $DirectoryPath | % ToString
 }
