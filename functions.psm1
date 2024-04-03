@@ -39,7 +39,7 @@ function rme {
 }
 
 function rmf {
-	rm -Recurse -Force @Args
+	rm -Recurse -Force @Args -ErrorAction Ignore
 }
 
 function touch {
@@ -59,6 +59,43 @@ function gitl {
 	git log @Args
 }
 
+function mklink {
+	param(
+		[Parameter(Mandatory)][string]$Path,
+		[Parameter(Mandatory)][string]$Target
+	)
+
+	$Path = Resolve-VirtualPath $Path
+	$Target = ($Target -replace "/", "\").TrimEnd([char]"\")
+
+	$ResolvedTarget = Join-Path (Split-Path $Path) $Target
+	if (Test-Path -Type Container $ResolvedTarget) {
+		[System.IO.Directory]::CreateSymbolicLink($Path, $Target)
+	} elseif (Test-Path -Type Leaf $ResolvedTarget) {
+		[System.IO.File]::CreateSymbolicLink($Path, $Target)
+	} else {
+		throw "Target does not exist: $ResolvedTarget"
+	}
+}
+
+function rcp {
+	param(
+		[Parameter(Mandatory)][string[]]$Path,
+		<# EXAMPLE: user@domain.com:~/path/to/target #>
+		[Parameter(Mandatory)][string]$Destination
+	)
+
+	# remove trailing slash, tar does not like it
+	$Path = ($Path -replace "\\", "/") -replace "/$"
+	$SshHost, $DestinationPath = $Destination -split ":", 2
+	$DestinationPath = $DestinationPath -replace "\\", "/"
+
+	# needs $PSNativeCommandPreserveBytePipe feature (iirc default since 7.4)
+	# quoted to work around the dumb `PSNativeWindowsTildeExpansion` experimental feature
+	ssh $SshHost rm -r "$DestinationPath/*"
+	tar czf - $Path | ssh $SshHost tar xvzfC - "$DestinationPath"
+}
+
 function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	# 2019
 	#& 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
@@ -66,8 +103,10 @@ function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
 	#& 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1'
 
 	# replacement manual script
+	# https://github.com/microsoft/vswhere/wiki/Find-VC
 	$VsWherePath = Join-Path ${env:ProgramFiles(x86)} "\Microsoft Visual Studio\Installer\vswhere.exe"
-	$VsPath = & $VsWherePath -products Microsoft.VisualStudio.Product.BuildTools -latest -property installationPath
+	$VsPath = & $VsWherePath -products * -requires Microsoft.VisualStudio.Component.VC.Tools* -property installationPath -latest -prerelease
+	$VsPath = $VsPath | select -First 1
 	if ($null -eq $VsPath) {
 		throw "'vswhere.exe' could not find any MSVC installation."
 	}
@@ -405,6 +444,21 @@ function drop {
 				return $_
 			}
 		}
+	}
+}
+
+function enumerate {
+	begin {[ulong]$i = 0}
+	process {[pscustomobject]@{Index = $i++; Item = $_}}
+}
+
+function Get-RandomPassword($Length = 40, [switch]$AsPlaintext) {
+	$Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	$Password = (Get-SecureRandom -Maximum $Alphabet.Length -Count $Length | % {$Alphabet[$_]}) -join ""
+	if ($AsPlaintext) {
+		return $Password
+	} else {
+		return $Password | ConvertTo-SecureString -AsPlaintext
 	}
 }
 
