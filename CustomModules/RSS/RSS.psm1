@@ -48,11 +48,13 @@ function _ReadRSSFeedSingle {
 
 	foreach ($i in Invoke-RestMethod -Uri $Source.Uri -Verbose:$false) {
 		$Title = try {
-			$t = if ($i.title.GetType() -eq [string]) {$i.title} else {$i.title.'#text'}
+			$t = if ($i.title -is [string]) {$i.title}
+				elseif ($i.title -is [array] -and $i.title[0] -is [string]) {$i.title[0]}
+				else {$i.title.'#text'}
 			[System.Web.HttpUtility]::HtmlDecode($t)
 		} catch {$null}
 		$Link = try {
-			if ($i.{link}?.GetType() -eq [string]) {$i.link} else {$i.link.href}
+			if ($i.link -is [string]) {$i.link} else {$i.link.href}
 		} catch {$null}
 
 		$PublishedStr = try {$i.published} catch {$i.pubDate}
