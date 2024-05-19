@@ -85,5 +85,5 @@ function Show-LockedFile {
 		$DirectoryPath
 	)
 
-	Get-LockedFiles $DirectoryPath | % ToString
+	Get-LockedFile $DirectoryPath | % ToString
 }
