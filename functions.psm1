@@ -21,6 +21,9 @@ Set-Alias npp Invoke-Notepad
 Set-Alias e Push-ExternalLocation
 Set-Alias o Open-TextFile
 
+$global:PSDefaultParameterValues["Launch-VsDevShell.ps1:Arch"] = "amd64"
+Set-Alias msvc "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1"
+
 
 function .. {
 	cd ..
@@ -94,24 +97,6 @@ function rcp {
 	# quoted to work around the dumb `PSNativeWindowsTildeExpansion` experimental feature
 	ssh $SshHost rm -r "$DestinationPath/*"
 	tar czf - $Path | ssh $SshHost tar xvzfC - "$DestinationPath"
-}
-
-function msvc([ValidateSet('x86','amd64','arm','arm64')]$Arch = 'amd64') {
-	# 2019
-	#& 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
-	# 2022, doesn't work from my pwsh config, uses an undefined variable
-	#& 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1'
-
-	# replacement manual script
-	# https://github.com/microsoft/vswhere/wiki/Find-VC
-	$VsWherePath = Join-Path ${env:ProgramFiles(x86)} "\Microsoft Visual Studio\Installer\vswhere.exe"
-	$VsPath = & $VsWherePath -products * -requires Microsoft.VisualStudio.Component.VC.Tools* -property installationPath -latest -prerelease
-	$VsPath = $VsPath | select -First 1
-	if ($null -eq $VsPath) {
-		throw "'vswhere.exe' could not find any MSVC installation."
-	}
-	Import-Module (Join-Path $VsPath "\Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
-	Enter-VsDevShell -Arch $Arch -HostArch amd64 -VsInstallPath $VsPath
 }
 
 function Get-GithubVersion([string[]]$Repo) {
