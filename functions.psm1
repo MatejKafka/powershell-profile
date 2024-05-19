@@ -127,6 +127,51 @@ function findo($Pattern, $Path = ".", $Context = 0, [switch]$CaseSensitive, [swi
 		| % {o $_.Path $_.LineNumber -Gui:$Gui}
 }
 
+function reflect {
+	[CmdletBinding()]
+	param(
+			[Parameter(Mandatory)]
+		$Object,
+			[Parameter(Mandatory)]
+			[ArgumentCompleter({
+				param($CommandName, $ParameterName, $WordToComplete, $CommandAst, $FakeBoundParameters)
+
+				if ($FakeBoundParameters.ContainsKey("Object")) {
+					return $FakeBoundParameters["Object"].GetType().GetMembers([System.Reflection.BindingFlags]"NonPublic,Public,Instance") `
+						| ? {-not ($_.Attributes -band [System.Reflection.MethodAttributes]::SpecialName) -and $_.Name -notlike "<*>k__BackingField"} `
+						| % Name | select -Unique
+				}
+			})]
+			[string]
+		$Name,
+			[Parameter(ValueFromRemainingArguments)]
+		$Args
+	)
+
+	$Members = $Object.GetType().GetMember($Name, [System.Reflection.BindingFlags]"NonPublic,Public,Instance")
+	if (-not $Members) {
+		throw "Member not found."
+	}
+
+	if ($Members[0] -is [System.Reflection.PropertyInfo] -or $Members[0] -is [System.Reflection.FieldInfo]) {
+		if (-not $Args) {
+			# use WriteObject, ordinary return would unroll any enumerables
+			$PSCmdlet.WriteObject($Members[0].GetValue($Object), $false)
+		} elseif (@($Args).Count -eq 1) {
+			$PSCmdlet.WriteObject($Members[0].SetValue($Object, $Args[0]), $false)
+		} else {
+			throw "Too many arguments for a property setter."
+		}
+	
+	} elseif ($Members[0] -is [System.Reflection.MethodInfo]) {
+		if (@($Members).Count -ne 1) {
+			throw "Multiple matching method overloads, overload resolution is not currently supported."
+		}
+
+		$PSCmdlet.WriteObject($Members[0].Invoke($Object, $Args), $false)
+	}
+}
+
 function Get-LatestEmail($HowMany, $ConfigFile) {
 	$Server = Connect-EmailServer -FilePath $ConfigFile
 	$Folder = $Server.Emails
