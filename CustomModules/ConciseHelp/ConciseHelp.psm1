@@ -141,11 +141,10 @@ function Get-ConciseHelp {
 			[Parameter(Mandatory)]
 			[string]
 			[ArgumentCompleter({
-            	param($commandName, $parameterName, $wordToComplete,
-                    $commandAst, $fakeBoundParameters)
-            	$Cmds = Get-Command "$wordToComplete*" -CommandType Alias, Application, Cmdlet, ExternalScript, Function, Script
-            	return $Cmds | % Name
-        	})]
+				param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+
+				return TabExpansion2 "help $wordToComplete" | % CompletionMatches
+			})]
 		$Name,
 		### Show command and parameter description.
 		[switch]$Description,
