@@ -223,7 +223,7 @@ function global:Prompt {
 
 	# render status string
 	$StatusStr, $VTMarkStr = BuildStatusStr $ErrorOccurred $ExitCode $script:_LastCmdOutputTypes
-	$CwdString = $ExecutionContext.SessionState.Path.CurrentLocation.ProviderPath
+	$CwdString = $ExecutionContext.SessionState.Path.CurrentLocation.Path
 
 	# VT mark: prompt started
 	$VTMarkStr += "`e]133;A$([char]07)"

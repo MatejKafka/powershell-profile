@@ -32,11 +32,27 @@ Set-PSReadLineKeyHandler -Key "Tab" -ScriptBlock {
 	$cursor = $null
 	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 
-	$pos = $line.LastIndexOf("`n", [Math]::max(0, $cursor - 1)) + 1
-	if ($line.Substring($pos, $cursor - $pos).Trim() -eq "") {
+	$lineStartI = $line.LastIndexOf("`n", [Math]::max(0, $cursor - 1)) + 1
+	if ($line.Substring($lineStartI, $cursor - $lineStartI).Trim() -eq "") {
 		[Microsoft.Powershell.PSConsoleReadLine]::Insert("    ")
 	} else {
 		[Microsoft.PowerShell.PSConsoleReadLine]::MenuComplete($key, $arg)
+	}
+}
+
+# if at the beginning of a line, remove all indentation
+Set-PSReadLineKeyHandler -Key "Shift+Tab" -ScriptBlock {
+	param($key, $arg)
+
+	$line = $null
+	$cursor = $null
+	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+
+	$lineStartI = $line.LastIndexOf("`n", [Math]::max(0, $cursor - 1)) + 1
+	if ($line.Substring($lineStartI, $cursor - $lineStartI).Trim() -eq "") {
+		[Microsoft.Powershell.PSConsoleReadLine]::Delete($lineStartI, $cursor - $lineStartI)
+	} else {
+		[Microsoft.PowerShell.PSConsoleReadLine]::TabCompletePrevious($key, $arg)
 	}
 }
 
