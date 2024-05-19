@@ -8,7 +8,7 @@ $_Times = @{
 Set-StrictMode -Version Latest
 # stop even on non-critical errors
 $global:ErrorActionPreference = "Stop"
-$global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
+#$global:PSDefaultParameterValues["*:ErrorAction"] = $ErrorActionPreference
 # throw error when native command returns non-zero exit code
 $global:PSNativeCommandUseErrorActionPreference = $true
 # show Information log stream
