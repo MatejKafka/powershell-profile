@@ -3,6 +3,10 @@ $ErrorActionPreference = "Stop"
 
 
 function Invoke-WithEnvironment {
+	if (-not $Args) {
+		return ls Env:
+	}
+
 	# parse arguments
 	$NewEnv = @{}
 	$CommandArgs = @()
