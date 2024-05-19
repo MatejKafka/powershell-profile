@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 function Read-HostListChoice {
 	[CmdletBinding()]
 	param(
-			[Parameter(Mandatory, ValueFromPipeline)]
+			[Parameter(ValueFromPipeline)]
 			[array]
 		$Item,
 			[string]
