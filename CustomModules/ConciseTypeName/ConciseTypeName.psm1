@@ -49,16 +49,19 @@ function Get-ConciseTypeName {
 		$Name = $Matches[1]
 	}
 
-	$FullName = $Type.Namespace + "." + $Name
-	$FullName = $ConciseTypeMap[$FullName] ?? $FullName
+	if ($null -ne $Type.Namespace) {
+		$Name = $Type.Namespace + "." + $Name
+	}
 
-	if ($StripSystem -and $FullName.StartsWith("System.")) {
-		$FullName = $FullName.Substring(7)
+	$Name = $ConciseTypeMap[$Name] ?? $Name
+
+	if ($StripSystem -and $Name.StartsWith("System.")) {
+		$Name = $Name.Substring(7)
 	}
 
 	if ($Type.GenericTypeArguments.Count -gt 0) {
-		$FullName += "[" + (($Type.GenericTypeArguments | % {Get-ConciseTypeName $_}) -join ", ") + "]"
+		$Name += "[" + (($Type.GenericTypeArguments | % {Get-ConciseTypeName $_}) -join ", ") + "]"
 	}
 
-	return $FullName
+	return $Name
 }
