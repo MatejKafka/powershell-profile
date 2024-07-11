@@ -16,8 +16,7 @@ function OnIdleEventHandler {
 
 	if ($global:_DelayLoad_ScriptQueue.Count -eq 0) {
 		# queue is empty, the event handler will be restarted when more scripts are added
-		# this must run as the list thing, because it terminates even the current handler
-		Unregister-Event $Event
+		$Event | Unregister-Event
 	}
 }
 
