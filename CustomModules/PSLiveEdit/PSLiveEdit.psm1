@@ -1,9 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-New-Alias edit Edit-Command
-New-Alias editm Edit-Module
-New-Alias reloadm Update-LoadedModule
+Set-Alias edit Edit-Command
+Set-Alias editm Edit-Module
+Set-Alias reloadm Update-LoadedModule
 
 
 <# NOTE: this cannot remove itself (this module). #>
@@ -96,7 +96,7 @@ function Edit-Command {
 	}
 
 	$EditorArgs = switch ($Cmd.CommandType) {
-		ExternalScript {$Cmd.Source}
+		ExternalScript {@($Cmd.Source, 0)}
 		"Function" {@($Cmd.ScriptBlock.File, $Cmd.ScriptBlock.StartPosition.StartLine)}
 		Cmdlet {
 			# we cannot edit cmdlet, it's a DLL; instead, open the module directory
