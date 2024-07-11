@@ -6,6 +6,10 @@ $ConciseTypeMap = @{
 	"System.String" = "String"
 	"System.Int32" = "Int"
 	"System.UInt32" = "UInt"
+	"System.Int64" = "Long"
+	"System.UInt64" = "ULong"
+
+	"System.DateTime" = "DateTime"
 
 	"System.Management.Automation.PSObject" = "PSObject"
 	"System.Management.Automation.PSCredential" = "PSCredential"
