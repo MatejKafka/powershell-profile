@@ -11,20 +11,38 @@ import re
 import getopt
 
 marker = '.'
-opts, args = getopt.getopt(sys.argv[1:], 'lp')
+title = None
+x_label = None
+y_label = None
+start_y_at_zero = False
+opts, args = getopt.getopt(sys.argv[1:], 'lp0t:x:y:')
 for o, a in opts:
-    if o == '-p':
-        marker = ''
-    if o == '-l':
-        marker += '-'
+    if o == '-p': marker = ''
+    if o == '-l': marker += '-'
+    if o == '-t': title = a
+    if o == '-x': x_label = a
+    if o == '-y': y_label = a
+    if o == '-0': start_y_at_zero = True
 
 
+show_legend = False
 x = []
 y = []
+data_label = None
 
 i = 0
 for line in sys.stdin:
-  vals = [float(n.strip()) for n in line.strip().split(",")]
+  line = line.strip()
+  if line.startswith("="):
+    if len(x) > 0:
+      plt.plot(x, y, marker, label=data_label)
+    x = []
+    y = []
+    data_label = line[1:].strip()
+    show_legend = True
+    continue
+
+  vals = [float(n.strip()) for n in line.split(",")]
   if len(vals) == 1:
     x.append(i)
     y.append(vals[0])
@@ -33,7 +51,17 @@ for line in sys.stdin:
     y.append(vals[1])
   i += 1
 
-plt.plot(x, y, marker)
+if len(x) > 0:
+  plt.plot(x, y, marker, label=data_label)
+
+if show_legend:
+  plt.legend()
+if start_y_at_zero:
+  plt.ylim(bottom=0)
+plt.title(title)
+plt.xlabel(x_label)
+plt.ylabel(y_label)
+
 plt.minorticks_on()
 plt.grid(which='both', color='#eee')
 plt.show()
