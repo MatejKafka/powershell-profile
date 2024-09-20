@@ -5,14 +5,15 @@ My heavily customized Powershell 7 profile directory. Primarily developed for Wi
 
 ## Installation
 
+First, install a [Nerd font](https://github.com/ryanoasis/nerd-fonts), which is necessary to correctly render the pretty boxes on the right side of the prompt. I personally use a [patched Fira Code](https://github.com/ryanoasis/nerd-fonts/tree/master/patched-fonts/FiraCode/Regular). If you want completions for common native commands, install [Carapace](https://github.com/carapace-sh/carapace-bin) and make sure `carapace` is available on `PATH`.
+
 ### Install directly to the PowerShell profile directory
 
 ```powershell
 # clone this repository and initialize submodules
 $ConfigDir = Split-Path $PROFILE
-git clone https://github.com/MatejKafka/powershell-profile $ConfigDir
+git clone --recursive https://github.com/MatejKafka/powershell-profile $ConfigDir
 cd $ConfigDir
-git submodule update --init --recursive
 
 # if you want more autocompletions, also install these modules
 Install-Module PSGitCompletions
@@ -22,11 +23,9 @@ Install-Module WSLTabCompletion
 ### Install to a custom directory
 
 ```powershell
-# clone this repository wherever you prefer
-git clone https://github.com/MatejKafka/powershell-profile
+# clone this repository wherever you prefer, including submodules
+git clone --recursive https://github.com/MatejKafka/powershell-profile
 cd powershell-profile
-# initialize submodules
-git submodule update --init --recursive
 
 # symlink the main profile from $PROFILE (default profile file path)
 New-Item -Type SymbolicLink $PROFILE -Target (Resolve-Path ./Microsoft.PowerShell_profile.ps1)

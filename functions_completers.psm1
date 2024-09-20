@@ -5,6 +5,10 @@ $ErrorActionPreference = "Stop"
 Export-ModuleMember
 
 
+# PowerShell still does have a way to autoload a completer; as a workaround, we load a very lightweight completer,
+# which loads the actual completer on first invocation
+
+
 $Flags = [System.Reflection.BindingFlags]"Instance, NonPublic"
 $Context = $ExecutionContext.GetType().GetField("_context", $Flags).GetValue($ExecutionContext)
 $NativeProp = $Context.GetType().GetProperty("NativeArgumentCompleters", $Flags)
@@ -13,8 +17,14 @@ function Set-SubstituteCompleter($CommandName, $CompleterModuleName) {
     $Context = $script:Context
     $NativeProp = $script:NativeProp
     Register-ArgumentCompleter -CommandName $CommandName -ScriptBlock {
-        # import the actual completer to replace this one
-        Import-Module -Global $CompleterModuleName -ErrorAction Ignore
+        try {
+            # import the actual completer to replace this one
+            Import-Module -Global $CompleterModuleName -ErrorAction Stop
+        } catch {
+            # if loading the completer fails, fall back to the default completer and log an error
+            #  (it will not be shown, but it will be available using `Get-Error`)
+            throw "Failed to run the autocompleter for '$CommandName', provided by module '$CompleterModuleName': $_"
+        }
         # forward it once
         $Completer = $NativeProp.GetValue($Context)[$CommandName]
         return & $Completer @Args
