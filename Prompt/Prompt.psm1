@@ -17,7 +17,7 @@ Import-Module $PSScriptRoot\FSNav -ArgumentList ([ref]$script:ReuseLastCommandSt
 
 
 # written by our overriden version of Out-Default
-$script:_LastCmdOutputTypes = @()
+$script:_LastCmdOutputTypes = [System.Collections.Generic.List[type]]::new()
 # without setting this, drawing prompt would fail
 $global:LastExitCode = 0
 # LastExitCode is overwritten on each prompt; LastExitCode of the previous entered command is stored here
@@ -64,7 +64,7 @@ function Get-CommandStatusString {
 		$LastExitCode,
 			[Parameter(Mandatory)]
 			[AllowEmptyCollection()]
-			[System.Type[]]
+			[System.Collections.Generic.List[type]]
 		$CmdOutputTypes
 	)
 
@@ -72,10 +72,10 @@ function Get-CommandStatusString {
 	$StatusStr = ""
 
 	# render output type of the command, unless it resulted in an error
-	if ($CmdOutputTypes.Length -gt 0 -and -not $ErrorOccurred) {
+	if ($CmdOutputTypes.Count -gt 0 -and -not $ErrorOccurred) {
 		$FirstType = Get-ConciseTypeName $CmdOutputTypes[0] -StripSystem
-		if ($CmdOutputTypes.Length -gt 1) {
-			$StatusStr += "[" + $CmdOutputTypes.Length + "]"
+		if ($CmdOutputTypes.Count -gt 1) {
+			$StatusStr += "[" + $CmdOutputTypes.Count + "]"
 		}
 		$StatusStr += $FirstType + " | "
 	}
@@ -224,6 +224,10 @@ function global:Prompt {
 	# render status string
 	$StatusStr, $VTMarkStr = BuildStatusStr $ErrorOccurred $ExitCode $script:_LastCmdOutputTypes
 	$CwdString = $ExecutionContext.SessionState.Path.CurrentLocation.Path
+	if ($CwdString -like "Microsoft.PowerShell.Core\FileSystem::*") {
+		# this happens e.g. after `gi dir | cd`
+		$CwdString = $ExecutionContext.SessionState.Path.CurrentLocation.ProviderPath
+	}
 
 	# VT mark: prompt started
 	$VTMarkStr += "`e]133;A$([char]07)"
@@ -262,9 +266,9 @@ function global:Prompt {
 	# reset exit code
 	$global:PreviousCommandExitCode = $global:LastExitCode
 	$global:LastExitCode = 0
-	# reset last output types and move them to the user-accessible $global:Types variable
-	$global:Types = $script:_LastCmdOutputTypes
-	$script:_LastCmdOutputTypes = @()
+	# reset last output types and store them in the user-accessible $global:Types variable
+	$global:Types = $script:_LastCmdOutputTypes.ToArray()
+	$script:_LastCmdOutputTypes.Clear()
 
 	return "> "
 }
@@ -297,7 +301,7 @@ function global:Out-Default {
 	process {
 		$SteppablePipeline.Process($_)
 		if ($null -ne $_) {
-			$script:_LastCmdOutputTypes += $_.GetType()
+			$script:_LastCmdOutputTypes.Add($_.GetType())
 		}
 	}
 

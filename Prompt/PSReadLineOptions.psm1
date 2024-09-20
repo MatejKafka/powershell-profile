@@ -1,3 +1,5 @@
+using namespace Microsoft.PowerShell
+
 Set-StrictMode -Version Latest
 Export-ModuleMember # don't export anything
 
@@ -30,13 +32,13 @@ Set-PSReadLineKeyHandler -Key "Tab" -ScriptBlock {
 
 	$line = $null
 	$cursor = $null
-	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+	[PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 
 	$lineStartI = $line.LastIndexOf("`n", [Math]::max(0, $cursor - 1)) + 1
 	if ($line.Substring($lineStartI, $cursor - $lineStartI).Trim() -eq "") {
-		[Microsoft.Powershell.PSConsoleReadLine]::Insert("    ")
+		[PSConsoleReadLine]::Insert("    ")
 	} else {
-		[Microsoft.PowerShell.PSConsoleReadLine]::MenuComplete($key, $arg)
+		[PSConsoleReadLine]::MenuComplete($key, $arg)
 	}
 }
 
@@ -46,13 +48,13 @@ Set-PSReadLineKeyHandler -Key "Shift+Tab" -ScriptBlock {
 
 	$line = $null
 	$cursor = $null
-	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+	[PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 
 	$lineStartI = $line.LastIndexOf("`n", [Math]::max(0, $cursor - 1)) + 1
 	if ($line.Substring($lineStartI, $cursor - $lineStartI).Trim() -eq "") {
-		[Microsoft.Powershell.PSConsoleReadLine]::Delete($lineStartI, $cursor - $lineStartI)
+		[PSConsoleReadLine]::Delete($lineStartI, $cursor - $lineStartI)
 	} else {
-		[Microsoft.PowerShell.PSConsoleReadLine]::TabCompletePrevious($key, $arg)
+		[PSConsoleReadLine]::TabCompletePrevious($key, $arg)
 	}
 }
 
@@ -62,12 +64,12 @@ Set-PSReadLineKeyHandler -Key "End" -ScriptBlock {
 
     $line = $null
     $cursor = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+    [PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 
     if ($cursor -lt $line.Length) {
-        [Microsoft.PowerShell.PSConsoleReadLine]::EndOfLine($key, $arg)
+        [PSConsoleReadLine]::EndOfLine($key, $arg)
     } else {
-        [Microsoft.PowerShell.PSConsoleReadLine]::AcceptSuggestion($key, $arg)
+        [PSConsoleReadLine]::AcceptSuggestion($key, $arg)
     }
 }
 
@@ -80,15 +82,30 @@ Set-PSReadLineKeyHandler -Key RightArrow `
 
 	$line = $null
 	$cursor = $null
-	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+	[PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 
 	if ($cursor -lt $line.Length) {
-		[Microsoft.PowerShell.PSConsoleReadLine]::ForwardChar($key, $arg)
+		[PSConsoleReadLine]::ForwardChar($key, $arg)
 	} else {
-		[Microsoft.PowerShell.PSConsoleReadLine]::AcceptNextSuggestionWord($key, $arg)
+		[PSConsoleReadLine]::AcceptNextSuggestionWord($key, $arg)
 	}
 }
 
+# Wrap the current whitespace-delimited token in quotes.
+Set-PSReadLineKeyHandler -Key 'Ctrl+"' -ScriptBlock {
+	$line, $cursor = $null
+	[PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+	$whitespaceChars = [char[]]@(" ", "`n", "`t")
+	$startI = $line.LastIndexOfAny($whitespaceChars, $cursor - 1) + 1
+
+	$endI = $cursor -eq $line.Length ? -1 : $line.IndexOfAny($whitespaceChars, $cursor)
+	if ($endI -eq -1) {
+		$endI = $line.Length
+	}
+
+	[PSConsoleReadLine]::Replace($startI, $endI - $startI, '"' + $line.Substring($startI, $endI - $startI) + '"')
+	[PSConsoleReadLine]::SetCursorPosition($cursor + 1)
+}
 
 # Sometimes you want to get a property of invoke a member on what you've entered so far
 # but you need parens to do that.  This binding will help by putting parens around the current selection,
@@ -101,17 +118,17 @@ Set-PSReadLineKeyHandler -Key 'Alt+(' `
 
 	$selectionStart = $null
 	$selectionLength = $null
-	[Microsoft.PowerShell.PSConsoleReadLine]::GetSelectionState([ref]$selectionStart, [ref]$selectionLength)
+	[PSConsoleReadLine]::GetSelectionState([ref]$selectionStart, [ref]$selectionLength)
 
 	$line = $null
 	$cursor = $null
-	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+	[PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 	if ($selectionStart -ne -1) {
-		[Microsoft.PowerShell.PSConsoleReadLine]::Replace($selectionStart, $selectionLength, '(' + $line.SubString($selectionStart, $selectionLength) + ')')
-		[Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($selectionStart + $selectionLength + 2)
+		[PSConsoleReadLine]::Replace($selectionStart, $selectionLength, '(' + $line.SubString($selectionStart, $selectionLength) + ')')
+		[PSConsoleReadLine]::SetCursorPosition($selectionStart + $selectionLength + 2)
 	} else {
-		[Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, '(' + $line + ')')
-		[Microsoft.PowerShell.PSConsoleReadLine]::EndOfLine()
+		[PSConsoleReadLine]::Replace(0, $line.Length, '(' + $line + ')')
+		[PSConsoleReadLine]::EndOfLine()
 	}
 }
 
@@ -126,7 +143,7 @@ Set-PSReadLineKeyHandler -Key Alt+a `
   
 	$ast = $null
 	$cursor = $null
-	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$ast, [ref]$null, [ref]$null, [ref]$cursor)
+	[PSConsoleReadLine]::GetBufferState([ref]$ast, [ref]$null, [ref]$null, [ref]$cursor)
   
 	$asts = $ast.FindAll({
 		$args[0] -is [System.Management.Automation.Language.ExpressionAst] -and
@@ -135,7 +152,7 @@ Set-PSReadLineKeyHandler -Key Alt+a `
 	}, $true)
   
 	if ($asts.Count -eq 0) {
-		[Microsoft.PowerShell.PSConsoleReadLine]::Ding()
+		[PSConsoleReadLine]::Ding()
 		return
 	}
 	
@@ -165,7 +182,7 @@ Set-PSReadLineKeyHandler -Key Alt+a `
 		$endOffsetAdjustment = 2
 	}
   
-	[Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($nextAst.Extent.StartOffset + $startOffsetAdjustment)
-	[Microsoft.PowerShell.PSConsoleReadLine]::SetMark($null, $null)
-	[Microsoft.PowerShell.PSConsoleReadLine]::SelectForwardChar($null, ($nextAst.Extent.EndOffset - $nextAst.Extent.StartOffset) - $endOffsetAdjustment)
+	[PSConsoleReadLine]::SetCursorPosition($nextAst.Extent.StartOffset + $startOffsetAdjustment)
+	[PSConsoleReadLine]::SetMark($null, $null)
+	[PSConsoleReadLine]::SelectForwardChar($null, ($nextAst.Extent.EndOffset - $nextAst.Extent.StartOffset) - $endOffsetAdjustment)
 }
