@@ -1,3 +1,5 @@
+$Shell = New-Object -ComObject "Shell.Application"
+
 <#
 	Returns all directories opened in File Explorer.
 	File Explorer must have the option to list full path as window title enabled for this to work.
@@ -7,13 +9,8 @@ function Get-ExplorerDirectory {
 	[OutputType([IO.DirectoryInfo])]
 	param()
 
-	$ExplorerPids = Get-Process explorer -ErrorAction Ignore | % Id
-	return [FileManagerDirectory.Win32Window]::GetWindows()
-		| ? ProcessId -in $ExplorerPids
-		| % Title
-		# File Explorer windows have the full path as window title
-		| ? {Test-Path -Type Container $_}
-		| Get-Item
+	# this is somewhat slow for network drives, but much faster than scraping the window for local folders
+	return $Shell.Windows() | % {$_.Document.Folder.Self.Path} | ? {-not $_.StartsWith("::")} | Get-Item
 }
 
 function Get-AltapSalamanderDirectory {
