@@ -188,6 +188,7 @@ function Get-LatestEmail($HowMany, $ConfigFile) {
 function pinvoke([string]$Signature, $Dll = "kernel32.dll") {
 	Add-Type @"
 using System;
+using System.Text;
 using System.Runtime.InteropServices;
 
 public static partial class Win32 {
@@ -249,9 +250,37 @@ function manl {
 	wsl -- man @Args
 }
 
+function w {
+	$WslArgs = @($Args | % {$_.ToString().Replace("\", "/")})
+	wsl -- @WslArgs
+}
+
+function wcmake([ValidateSet("Release", "Debug", "RelWithDebInfo", "MinSizeRel")][string]$BuildType = "Release", [switch]$Clang, [switch]$Verbose, [switch]$Force) {
+	$BuildDir = "cmake-build-$($BuildType.ToLowerInvariant())$(if ($Clang) {"-clang"})"
+
+	if ($Force -and (Test-Path $BuildDir)) {
+		rm -Recurse $BuildDir
+	}
+
+	$Args = if ($Clang) {@("-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++")} else {@()}
+
+	if (-not (Test-Path $BuildDir)) {
+		echo "cmake -S . -B $BuildDir -G Ninja -DCMAKE_BUILD_TYPE=$BuildType $($Args -join " ")"
+		wsl -- cmake -S . -B $BuildDir -G Ninja "-DCMAKE_BUILD_TYPE=$BuildType" @Args
+	}
+	echo "cmake --build $BuildDir $($Verbose ? "--verbose" : $null)"
+	wsl -- cmake --build $BuildDir $($Verbose ? "--verbose" : $null)
+}
+
 function Sleep-Computer {
 	Add-Type -AssemblyName System.Windows.Forms
 	$null = [System.Windows.Forms.Application]::SetSuspendState("Suspend", $false, $false)
+}
+
+function Get-SleepEvent {
+	Get-WinEvent -ProviderName Microsoft-Windows-Kernel-Power, Microsoft-Windows-Power-Troubleshooter
+		| ? Id -in 1, 41, 42
+		| select TimeCreated, Message -First 30
 }
 
 class _CwdLnkShortcuts : System.Management.Automation.IValidateSetValuesGenerator {
@@ -285,6 +314,7 @@ function Get-Wifi {
 	)
 	return Get-WifiProfile -ClearKey $Name
 }
+Set-Alias wifi Get-Wifi
 
 function Push-ExternalLocation {
 	[array]$Dirs = Get-FileManagerDirectory
@@ -412,15 +442,22 @@ function tmp($Extension, $Prefix = "") {
 }
 
 <# Convert the passed number to hex. #>
-function hex([Parameter(Mandatory)]$n) {
+function hex([Parameter(Mandatory)]$n, $FormatSpecifier = "0x{0:X}") {
 	if ($n -is [string]) {
-		$ln = [long]$n
-		if ($ln -gt [int32]::MaxValue -or $ln -lt [int32]::MinValue) {
-			return "0x{0:X}" -f $ln
-		}
-		$n = [int32]$n
+		$n = [long]$n
+		try {$n = [int]$n} catch {} # throws when the cast overflows
+	} elseif ($n -is [decimal]) {
+		throw "Decimal is not supported."
+	} else {
+		# https://github.com/PowerShell/PowerShell/issues/24018
+		$n = [System.Management.Automation.LanguagePrimitives]::ConvertTo($n, $n.GetType())
 	}
-	return "0x{0:X}" -f $n
+	return $FormatSpecifier -f $n
+}
+
+<# Convert the passed number to binary. #>
+function bin([Parameter(Mandatory)]$n) {
+	return hex $n "0b{0:b}"
 }
 
 
@@ -481,6 +518,22 @@ function enumerate {
 	begin {[ulong]$i = 0}
 	process {[pscustomobject]@{Index = $i++; Item = $_}}
 }
+
+function join([string]$Delimiter = '') {
+	begin {$Sb = [System.Text.StringBuilder]::new()}
+	process {
+		foreach ($str in $Input) {
+			if ($Sb.Length -ne 0) {
+				$null = $Sb.Append($Delimiter)
+			}
+			$null = $Sb.Append($str.ToString())
+		}
+	}
+	end {
+		return $Sb.ToString()
+	}
+}
+
 
 function Get-RandomPassword($Length = 40, [switch]$AsPlaintext) {
 	$Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
