@@ -57,7 +57,7 @@ function _ReadRSSFeedSingle {
 			if ($i.link -is [string]) {$i.link} else {$i.link.href}
 		} catch {$null}
 
-		$PublishedStr = try {$i.published} catch {$i.pubDate}
+		$PublishedStr = try {$i.published} catch {try {$i.pubDate} catch {$i.date}}
 		$Published = if ($PublishedStr) {
 			try {
 				Get-Date $PublishedStr
