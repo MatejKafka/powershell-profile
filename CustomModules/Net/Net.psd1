@@ -10,6 +10,7 @@
 		"Test-SshConnection"
 		"Copy-SshId"
 		"Get-IPAddress"
+		"Show-IPAddress"
 	)
 	VariablesToExport = @()
 	CmdletsToExport = @()

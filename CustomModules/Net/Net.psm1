@@ -131,13 +131,43 @@ function Copy-SshId {
 }
 
 
-function Get-IPAddress {
-	Get-NetIPAddress
-#		| ? AddressFamily -eq "IPv4"
-		| ? SuffixOrigin -in @("Dhcp", "Manual")
-		| ? InterfaceAlias -NotLike "vEthernet (*)"
-		| ? AddressState -ne "Deprecated"
-		| select InterfaceAlias, IPAddress
+function Get-IPAddress([switch]$NoPublic, [switch]$NoPrivate) {
+	if (-not $NoPublic) {
+		# Resolve-DnsName would be more elegant than parsing nslookup, but the module is a bit slow to import
+		# resolver1 and resolver2 give IPv6 addresses, resolver 3 gives IPv4
+		if ((nslookup myip.opendns.com resolver3.opendns.com 2>$null)[4] -match "Address:  (.*)") {
+			[pscustomobject]@{
+				InterfaceAlias = "Public IPv4"
+				IPAddress = $Matches[1]
+			}
+		}
+		if ((nslookup myip.opendns.com resolver1.opendns.com 2>$null)[4] -match "Address:  (.*)") {
+			[pscustomobject]@{
+				InterfaceAlias = "Public IPv6"
+				IPAddress = $Matches[1]
+			}
+		}
+	}
+
+	if (-not $NoPrivate) {
+		Get-NetAdapter -Physical
+			| Get-NetIPAddress
+			| ? PrefixOrigin -ne WellKnown
+			| ? SuffixOrigin -ne Link
+			| ? AddressState -ne "Deprecated"
+			| select InterfaceAlias, IPAddress
+	}
 }
 
-New-Alias ip Get-IPAddress
+function Show-IPAddress([switch]$NoPublic, [switch]$NoPrivate) {
+	Get-IPAddress -NoPublic:$NoPublic -NoPrivate:$NoPrivate | group InterfaceAlias | % {
+		$N = $_.Name
+		$_.Group.IPAddress | sort Length | % {
+			[pscustomobject]@{InterfaceAlias = $N; IPAddress = $_}
+			$N = $null
+		}
+	} | Format-Table -AutoSize | Out-Host
+}
+
+
+New-Alias ip Show-IPAddress
