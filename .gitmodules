@@ -7,4 +7,6 @@
 [submodule "CustomModules/Write-HostColor"]
 	path = CustomModules/Write-HostColor
 	url = https://github.com/MatejKafka/Write-HostColor
-
+[submodule "CustomModules/PSPid"]
+	path = CustomModules/PSPid
+	url = https://github.com/MatejKafka/PSPid
