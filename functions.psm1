@@ -22,7 +22,11 @@ Set-Alias e Push-ExternalLocation
 Set-Alias o Open-TextFile
 
 $global:PSDefaultParameterValues["Launch-VsDevShell.ps1:Arch"] = "amd64"
-Set-Alias msvc "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1"
+
+"C:\Program Files", "C:\Program Files (x86)" `
+	| % {gi "$_\Microsoft Visual Studio\2022\*\Common7\Tools\Launch-VsDevShell.ps1" -ErrorAction Ignore} `
+	| select -First 1 `
+	| % {Set-Alias msvc $_.FullName}
 
 
 function .. {
@@ -61,6 +65,12 @@ function gitdc {
 function gitl {
 	git log @Args
 }
+function gitp {
+	git push @Args
+}
+function gitpf {
+	git push --force
+}
 
 function mklink {
 	param(
@@ -71,7 +81,7 @@ function mklink {
 	$Path = Resolve-VirtualPath $Path
 	$Target = ($Target -replace "/", "\").TrimEnd([char]"\")
 
-	$ResolvedTarget = Join-Path (Split-Path $Path) $Target
+	$ResolvedTarget = [System.IO.Path]::Combine((Split-Path $Path), $Target)
 	if (Test-Path -Type Container $ResolvedTarget) {
 		[System.IO.Directory]::CreateSymbolicLink($Path, $Target)
 	} elseif (Test-Path -Type Leaf $ResolvedTarget) {
@@ -162,7 +172,7 @@ function reflect {
 		} else {
 			throw "Too many arguments for a property setter."
 		}
-	
+
 	} elseif ($Members[0] -is [System.Reflection.MethodInfo]) {
 		if (@($Members).Count -ne 1) {
 			throw "Multiple matching method overloads, overload resolution is not currently supported."
@@ -192,8 +202,8 @@ using System.Text;
 using System.Runtime.InteropServices;
 
 public static partial class Win32 {
-    [DllImport("$Dll")]
-    public static extern $Signature;
+	[DllImport("$Dll")]
+	public static extern $Signature;
 }
 "@
 }
@@ -216,25 +226,25 @@ function s {
 # source: https://github.com/sethvs/sthArgumentCompleter/blob/master/sthArgumentCompleterFunctions.ps1
 function Get-ArgumentCompleter
 {
-    Param (
+	Param (
 		[switch]$Native,
 		[switch]$Custom
-    )
+	)
 
 	if (-not $Native -and -not $Custom) {
 		$Native = $true
 		$Custom = $true
 	}
 
-    $flags = [System.Reflection.BindingFlags]'Instance,NonPublic'
-    $_context = $ExecutionContext.GetType().GetField('_context',$flags).GetValue($ExecutionContext)
+	$flags = [System.Reflection.BindingFlags]'Instance,NonPublic'
+	$_context = $ExecutionContext.GetType().GetField('_context',$flags).GetValue($ExecutionContext)
 
-    if ($Custom) {
-        $_context.GetType().GetProperty('CustomArgumentCompleters',$flags).GetValue($_context)
-    }
+	if ($Custom) {
+		$_context.GetType().GetProperty('CustomArgumentCompleters',$flags).GetValue($_context)
+	}
 	if ($Native) {
-        $_context.GetType().GetProperty('NativeArgumentCompleters',$flags).GetValue($_context)
-    }
+		$_context.GetType().GetProperty('NativeArgumentCompleters',$flags).GetValue($_context)
+	}
 }
 
 function Resolve-VirtualPath {
@@ -331,19 +341,14 @@ function Push-ExternalLocation {
 	Set-Location $Selected
 }
 
-function ssh-config {
-	Open-TextFile $HOME\.ssh\config
-}
-
-
 function Expand-Msi([Parameter(Mandatory)]$MsiPath, [Parameter(Mandatory)]$OutputPath) {
-    $MsiPath = Resolve-Path $MsiPath
-    $OutputPath = Resolve-VirtualPath $OutputPath
+	$MsiPath = Resolve-Path $MsiPath
+	$OutputPath = Resolve-VirtualPath $OutputPath
 
-    # /qn = no GUI
-    # TARGETDIR = where to extract
-    Start-Process -Wait msiexec -ArgumentList /a, $MsiPath, /qn, TARGETDIR=$OutputPath
-    return Get-Item $OutputPath
+	# /qn = no GUI
+	# TARGETDIR = where to extract
+	Start-Process -Wait msiexec -ArgumentList /a, $MsiPath, /qn, TARGETDIR=$OutputPath
+	return Get-Item $OutputPath
 }
 
 function BulkRename() {
@@ -438,7 +443,7 @@ function Get-CmdExecutionTime($index=-1) {
 
 function tmp($Extension, $Prefix = "") {
 	$Tmp = if ($IsWindows) {$env:TEMP} else {"/tmp"}
-    return Join-Path $Tmp "$Prefix$(New-Guid)$Extension"
+	return Join-Path $Tmp "$Prefix$(New-Guid)$Extension"
 }
 
 <# Convert the passed number to hex. #>
@@ -542,6 +547,18 @@ function Get-RandomPassword($Length = 40, [switch]$AsPlaintext) {
 		return $Password
 	} else {
 		return $Password | ConvertTo-SecureString -AsPlaintext
+	}
+}
+
+
+function Get-ListeningService {
+	Get-NetTCPConnection | ? State -eq Listen | % {
+		$p = Get-Process -Id $_.OwningProcess
+		[pscustomobject]@{
+			LocalPort = $_.LocalPort
+			PID = $p.Id
+			CommandLine = $p.CommandLine
+		}
 	}
 }
 
