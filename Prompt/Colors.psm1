@@ -1,10 +1,11 @@
 Set-StrictMode -Version Latest
 
-$ColorSchemePath = Get-PSDataPath "PromptColorScheme.psd1" `
-		-DefaultContentPath $PSScriptRoot\_DefaultPromptColorScheme_DO_NOT_EDIT_SEE_README.psd1
+# use .ps1 instead of .psd1 to allow deeper customization (e.g. detecting the terminal and changing the the based on it)
+$ColorSchemePath = Get-PSDataPath "PromptColorScheme.ps1" `
+		-DefaultContentPath $PSScriptRoot\_DefaultPromptColorScheme_DO_NOT_EDIT_SEE_README.ps1
 
-# Import-PowerShellDataFile is not used because of https://github.com/PowerShell/PowerShell/issues/12789
-$UIColors = Invoke-Expression (Get-Content -Raw $ColorSchemePath)
+# load colors
+$UIColors = & $ColorSchemePath
 
 # run the custom setup script
 $null = & $UIColors.SetupScript
