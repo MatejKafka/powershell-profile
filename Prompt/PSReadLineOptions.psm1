@@ -186,3 +186,64 @@ Set-PSReadLineKeyHandler -Key Alt+a `
 	[PSConsoleReadLine]::SetMark($null, $null)
 	[PSConsoleReadLine]::SelectForwardChar($null, ($nextAst.Extent.EndOffset - $nextAst.Extent.StartOffset) - $endOffsetAdjustment)
 }
+
+function CommandLineToArgv($Cmd) {
+	if (-not $(try {[Win32CommandLineToArgv]} catch {})) {
+		Add-Type -CompilerOptions /unsafe @'
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public static partial class Win32CommandLineToArgv {
+	[DllImport("shell32.dll")]
+	private static unsafe extern char** CommandLineToArgvW([MarshalAs(UnmanagedType.LPWStr)] string lpCmdLine, out int pNumArgs);
+
+	public static unsafe string[] CommandLineToArgv(string lpCmdLine) {
+		lpCmdLine = lpCmdLine.Trim();
+		if (lpCmdLine == "") {
+			return [];
+		}
+
+		var ptr = CommandLineToArgvW(lpCmdLine, out var count);
+		if (ptr == null) {
+			return null;
+		}
+
+		var argv = new string[count];
+		for (var i = 0; i < count; i++) {
+			argv[i] = new string(ptr[i]);
+		}
+		return argv;
+	}
+}
+'@
+	}
+
+	return [Win32CommandLineToArgv]::CommandLineToArgv($Cmd)
+}
+
+Set-PSReadLineKeyHandler -Key Alt+r `
+			 -BriefDescription NativeArgs `
+			 -LongDescription "Convert a native Win32 cmdline string to something that PowerShell correctly passes as args to a native binary." `
+			 -ScriptBlock {
+
+	$InputStr = $null
+	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$InputStr, [ref]$null)
+	# not correct, but it's pretty useful when I'm manually changing some args and split them up in separate lines
+	$InputStr = $InputStr -replace "`n", " "
+	$CmdStr = CommandLineToArgv $InputStr | % {"'$_'"} | Join-String -Separator " "
+	[PSConsoleReadLine]::Replace(0, $InputStr.Length, "& $CmdStr")
+}
+
+Set-PSReadLineKeyHandler -Key Ctrl+Alt+r `
+			 -BriefDescription NativeArgsArray `
+			 -LongDescription "Convert a native Win32 cmdline string to an argv array literal." `
+			 -ScriptBlock {
+
+	$InputStr = $null
+	[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$InputStr, [ref]$null)
+	# not correct, but it's pretty useful when I'm manually changing some args and split them up in separate lines
+	$InputStr = $InputStr -replace "`n", " "
+	$CmdStr = CommandLineToArgv $InputStr | % {"'$_'"} | Join-String -Separator ", "
+	[PSConsoleReadLine]::Replace(0, $InputStr.Length, $CmdStr)
+}
