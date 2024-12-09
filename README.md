@@ -27,8 +27,8 @@ Install-Module WSLTabCompletion
 git clone --recursive https://github.com/MatejKafka/powershell-profile
 cd powershell-profile
 
-# symlink the main profile from $PROFILE (default profile file path)
-New-Item -Type SymbolicLink $PROFILE -Target (Resolve-Path ./Microsoft.PowerShell_profile.ps1)
+# symlink this directory from $PROFILE directory (default profile file path)
+New-Item -Type SymbolicLink (Split-Path $PROFILE) -Target (pwd)
 
 # if you want more autocompletions, also install these modules
 Install-Module PSGitCompletions
