@@ -22,7 +22,7 @@ Set-Alias e Push-ExternalLocation
 Set-Alias o Open-TextFile
 
 $global:PSDefaultParameterValues["Launch-VsDevShell.ps1:Arch"] = "amd64"
-
+$global:PSDefaultParameterValues["Launch-VsDevShell.ps1:SkipAutomaticLocation"] = $true
 "C:\Program Files", "C:\Program Files (x86)" `
 	| % {gi "$_\Microsoft Visual Studio\2022\*\Common7\Tools\Launch-VsDevShell.ps1" -ErrorAction Ignore} `
 	| select -First 1 `
@@ -70,6 +70,33 @@ function gitp {
 }
 function gitpf {
 	git push --force
+}
+function gitri {
+	$HasChanges = git status --porcelain
+	if ($HasChanges) {
+		git add -A
+		git stash
+	}
+
+	try {
+		git rebase -i @Args
+	} finally {
+		if ($HasChanges) {
+			$GitDir = git rev-parse --git-dir
+			if (Test-Path $GitDir\rebase-merge) {
+				# on-going merge
+				Write-Warning "Restore working tree changes when rebase is finished."
+			} else {
+				git stash pop
+				git reset
+			}
+		}
+	}
+}
+
+
+function og {
+	o -Gui @Args
 }
 
 function mklink {
@@ -195,17 +222,33 @@ function Get-LatestEmail($HowMany, $ConfigFile) {
 		}}
 }
 
-function pinvoke([string]$Signature, $Dll = "kernel32.dll") {
-	Add-Type @"
-using System;
-using System.Text;
-using System.Runtime.InteropServices;
+function pinvoke {
+	[CmdletBinding()]
+	param([array]$Signature, $ClassName = "Win32")
 
-public static partial class Win32 {
-	[DllImport("$Dll")]
-	public static extern $Signature;
-}
-"@
+	$Usings = @("System", "System.Text", "System.Runtime.InteropServices")
+	if ($(try {[Microsoft.Win32.SafeHandles.SafeFileHandle]} catch {})) {
+		$Usings += @("Microsoft.Win32.SafeHandles")
+	}
+
+	$DefStr = ""
+	$Usings | % {$DefStr += "using $_;`n"}
+	$DefStr += "`n"
+	$DefStr += "public static partial class $ClassName {`n"
+
+	$Signature | % {
+		$Dll, $Signature = if ($_.Trim() -match "\[(.*?)\.dll\]\s*(.*)") {
+			$Matches[1], $Matches[2]
+		} else {
+			"kernel32.dll", $_
+		}
+		$DefStr += "    [DllImport(`"$Dll`")]`n"
+		$DefStr += "    public static extern $Signature;`n"
+	}
+
+	$DefStr += "`n}"
+	Write-Verbose "`n$DefStr"
+	Add-Type $DefStr
 }
 
 
@@ -560,6 +603,10 @@ function Get-ListeningService {
 			CommandLine = $p.CommandLine
 		}
 	}
+}
+
+function Get-ModuleHelp($Name) {
+	(Get-Module $Name).ExportedCommands.GetEnumerator() | % Value | Get-Help | select Name, Synopsis
 }
 
 
