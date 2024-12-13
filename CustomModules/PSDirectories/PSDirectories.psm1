@@ -42,21 +42,18 @@ function Get-PSDataPath {
 		return Resolve-VirtualPath $Path
 	}
 
+	if (Test-Path $Path) {
+		return Get-Item $Path
+	}
+
+	if ($DefaultContentPath) {
+		$null = New-Item -Type Directory -Force (Split-Path $Path)
+		return Copy-Item -Recurse $DefaultContentPath $Path -PassThru
+	}
+
 	if (-not $Directory) {
-		if (Test-Path -Type Leaf $Path) {
-			return Get-Item $Path
-		} elseif ($DefaultContentPath) {
-			New-Item -Type Directory -Force (Split-Path $Path)
-			return Copy-Item $DefaultContentPath $Path -PassThru
-		}
 		return New-Item $Path
 	} else {
-		if (Test-Path -Type Container $Path) {
-			return Get-Item $Path
-		} elseif ($DefaultContentPath) {
-			New-Item -Type Directory -Force (Split-Path $Path)
-			return Copy-Item -Recurse $DefaultContentPath $Path -PassThru
-		}
 		return New-Item -Type Directory $Path
 	}
 }
